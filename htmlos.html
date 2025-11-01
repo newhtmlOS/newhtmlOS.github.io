@@ -1,0 +1,394 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1"/>
+<title>htmlOS</title>
+<style>
+:root{
+  --bg:#0b1220; --panel:#0f1724; --accent:#2dd4bf;
+  --text:#e6eef8; --muted:#9fb1c9;
+}
+*{box-sizing:border-box;font-family:Inter,ui-sans-serif,system-ui,-apple-system,"Segoe UI",Roboto,'Helvetica Neue',Arial;margin:0;padding:0}
+html,body{height:100%;background:linear-gradient(180deg,#071026 0%, #081526 50%, #071222 100%);color:var(--text);overflow:hidden}
+.desktop{width:100%;height:100%;position:relative;display:flex;flex-direction:column}
+.wallpaper{flex:1;padding:20px;background:radial-gradient(circle at 10% 10%, rgba(45,212,191,0.06), transparent 20%), radial-gradient(circle at 80% 80%, rgba(125,106,255,0.03), transparent 20%)}
+.icons{display:flex;flex-wrap:wrap;gap:16px}
+.icon{width:88px;text-align:center;cursor:pointer;user-select:none}
+.icon .box{width:72px;height:72px;border-radius:12px;background:linear-gradient(180deg,rgba(255,255,255,0.02), rgba(255,255,255,0.01));display:flex;align-items:center;justify-content:center;margin:0 auto 8px;border:1px solid rgba(255,255,255,0.03)}
+.icon span{display:block;font-size:12px;color:var(--muted)}
+.taskbar{height:48px;background:linear-gradient(0deg, rgba(0,0,0,0.35), rgba(255,255,255,0.02));backdrop-filter:blur(6px);display:flex;align-items:center;padding:0 8px;gap:8px}
+.start{width:36px;height:36px;border-radius:8px;background:var(--panel);display:flex;align-items:center;justify-content:center;cursor:pointer}
+.task-controls{display:flex;gap:8px;align-items:center;margin-left:auto;margin-right:8px;color:var(--muted)}
+.clock{min-width:80px;text-align:right}
+.window{position:absolute;width:720px;height:480px;background:linear-gradient(180deg, rgba(255,255,255,0.02), rgba(255,255,255,0.01));border-radius:10px;border:1px solid rgba(255,255,255,0.06);box-shadow:0 10px 30px rgba(0,0,0,0.6);overflow:hidden;display:flex;flex-direction:column}
+.titlebar{height:36px;display:flex;align-items:center;padding:0 8px;gap:8px;background:linear-gradient(180deg, rgba(255,255,255,0.01), transparent);touch-action:none;user-select:none}
+.title{flex:1;font-size:13px;color:var(--text)}
+.controls{display:flex;gap:6px}
+.btn{width:28px;height:24px;border-radius:6px;display:inline-flex;align-items:center;justify-content:center;cursor:pointer}
+.btn:hover{background:rgba(255,255,255,0.02)}
+.content{flex:1;padding:12px;background:linear-gradient(180deg, rgba(255,255,255,0.005), transparent);overflow:auto}
+.terminal{font-family:monospace;background:#071320;padding:12px;border-radius:8px;color:#bfe9d7;height:100%;overflow:auto}
+.startmenu{position:absolute;left:8px;bottom:56px;width:260px;background:var(--panel);border-radius:10px;padding:12px;border:1px solid rgba(255,255,255,0.03);box-shadow:0 8px 24px rgba(0,0,0,0.5)}
+.startmenu h4{margin:0 0 8px 0;color:var(--text)}
+.startmenu button{display:block;width:100%;text-align:left;padding:8px;border-radius:8px;border:0;background:transparent;color:var(--muted);cursor:pointer}
+.hidden{display:none !important}
+@media(max-width:900px){.window{width:95%;height:70%;left:2.5%;top:5%}}
+</style>
+</head>
+<body>
+<div class="desktop" id="desktop">
+  <div class="wallpaper">
+    <div class="icons" id="icons">
+      <div class="icon" data-app="terminal"><div class="box">💻</div><span>Terminal</span></div>
+      <div class="icon" data-app="notes"><div class="box">📝</div><span>Notas</span></div>
+      <div class="icon" data-app="settings"><div class="box">⚙️</div><span>Config</span></div>
+    </div>
+  </div>
+
+  <div class="taskbar">
+    <div class="start" id="startBtn">☰</div>
+    <div class="task-controls">
+      <div id="tasks"></div>
+      <div class="clock" id="clock">--:--</div>
+    </div>
+  </div>
+
+  <div class="startmenu hidden" id="startMenu">
+    <h4>Menu Iniciar</h4>
+    <button data-app="terminal">Abrir Terminal</button>
+    <button data-app="notes">Abrir Notas</button>
+    <hr style="border:none;border-top:1px solid rgba(255,255,255,0.03);margin:8px 0">
+    <button id="logoutBtn">Recarregar htmlOS</button>
+  </div>
+
+  <template id="winTemplate">
+    <div class="window" data-id="">
+      <div class="titlebar">
+        <div class="title">Janela</div>
+        <div class="controls">
+          <div class="btn" data-action="min">—</div>
+          <div class="btn" data-action="max">□</div>
+          <div class="btn" data-action="close">✕</div>
+        </div>
+      </div>
+      <div class="content"></div>
+    </div>
+  </template>
+</div>
+
+<script>
+document.addEventListener('DOMContentLoaded', () => {
+  const desktop = document.getElementById('desktop');
+  const template = document.getElementById('winTemplate');
+  const tasks = document.getElementById('tasks');
+  const startMenu = document.getElementById('startMenu');
+  const startBtn = document.getElementById('startBtn');
+  const clockEl = document.getElementById('clock');
+  const iconsContainer = document.getElementById('icons');
+  let z = 5, idCounter = 1;
+
+  // Virtual filesystem
+  const fs = {
+    '/': {
+      type: 'dir',
+      children: {
+        home: { type: 'dir', children: {
+          user: { type: 'dir', children: {
+            'readme.txt': { type: 'file', content: 'Bem-vindo ao htmlOS!\nUse ls e cd para navegar.' }
+          }}
+        }},
+        etc: { type: 'dir', children: {
+          'motd.txt': { type: 'file', content: 'Message of the Day: Seja nerd! 🤓' }
+        }},
+        HTMLSYS: { type: 'dir', children: {
+          'sysfile.sys': { type: 'file', content: 'system core' }
+        }}
+      }
+    }
+  };
+
+  let cwd = '/home/user';
+
+  function normalizePath(p) {
+    if (!p) return '/';
+    if (p.startsWith('/')) {
+      const parts = p.split('/').filter(Boolean);
+      const out = [];
+      for (let part of parts) {
+        if (part === '..') out.pop();
+        else if (part !== '.') out.push(part);
+      }
+      return '/' + out.join('/');
+    } else {
+      const base = cwd === '/' ? [] : cwd.split('/').filter(Boolean);
+      const parts = p.split('/').filter(Boolean);
+      const out = base.slice();
+      for (let part of parts) {
+        if (part === '..') out.pop();
+        else if (part !== '.') out.push(part);
+      }
+      return '/' + out.join('/');
+    }
+  }
+
+  function getNode(path) {
+    const p = normalizePath(path);
+    if (p === '/') return fs['/'];
+    const parts = p.split('/').filter(Boolean);
+    let node = fs['/'];
+    for (let part of parts) {
+      if (!node.children || !node.children[part]) return null;
+      node = node.children[part];
+    }
+    return node;
+  }
+
+  function listDir(path) {
+    const node = getNode(path);
+    if (!node) return { error: 'Diretório não encontrado' };
+    if (node.type !== 'dir') return { error: 'Não é um diretório' };
+    return { children: Object.keys(node.children).map(name => ({ name, node: node.children[name] })) };
+  }
+
+  // Clock
+  function nowFmt() { const d = new Date(); return d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }); }
+  setInterval(() => clockEl.textContent = nowFmt(), 1000);
+  clockEl.textContent = nowFmt();
+
+  // Window and task management
+  function addTask(id, title) {
+    const t = document.createElement('button'); t.textContent = title; t.style.marginRight = '8px'; t.dataset.win = id;
+    tasks.appendChild(t);
+    t.addEventListener('click', () => {
+      const w = document.querySelector(`[data-id="${id}"]`);
+      if (!w) { t.remove(); return; }
+      if (w.style.display === 'none') w.style.display = 'flex';
+      w.style.zIndex = ++z;
+    });
+  }
+  function removeTask(id) { const tb = tasks.querySelector(`[data-win="${id}"]`); if (tb) tb.remove(); }
+
+  function makeDraggable(el) {
+    const title = el.querySelector('.titlebar');
+    let ox = 0, oy = 0, sx = 0, sy = 0, dragging = false;
+    function start(e) {
+      dragging = true;
+      const p = e.type.startsWith('touch') ? e.touches[0] : e;
+      ox = p.clientX; oy = p.clientY;
+      sx = parseInt(el.style.left || 0); sy = parseInt(el.style.top || 0);
+      el.style.zIndex = ++z;
+    }
+    function move(e) {
+      if (!dragging) return;
+      const p = e.type.startsWith('touch') ? e.touches[0] : e;
+      const nx = sx + (p.clientX - ox);
+      const ny = sy + (p.clientY - oy);
+      el.style.left = Math.max(8, Math.min(window.innerWidth - 100, nx)) + 'px';
+      el.style.top = Math.max(8, Math.min(window.innerHeight - 60, ny)) + 'px';
+    }
+    function end() { dragging = false; }
+    title.addEventListener('mousedown', start); document.addEventListener('mousemove', move); document.addEventListener('mouseup', end);
+    title.addEventListener('touchstart', start, { passive: false }); document.addEventListener('touchmove', move, { passive: false }); document.addEventListener('touchend', end);
+  }
+
+  function toggleMax(win) {
+    if (win.dataset.maxed === '1') {
+      win.style.width = win.dataset.w; win.style.height = win.dataset.h; win.style.left = win.dataset.l; win.style.top = win.dataset.t; win.dataset.maxed = '0';
+    } else {
+      win.dataset.w = win.style.width; win.dataset.h = win.style.height; win.dataset.l = win.style.left; win.dataset.t = win.style.top;
+      win.style.left = '0px'; win.style.top = '0px'; win.style.width = window.innerWidth + 'px'; win.style.height = (window.innerHeight - 48) + 'px'; win.dataset.maxed = '1';
+    }
+  }
+
+  function openApp(name) {
+    const win = template.content.cloneNode(true).querySelector('.window');
+    const winId = 'win-' + (idCounter++);
+    win.dataset.id = winId;
+    win.querySelector('.title').textContent = name.charAt(0).toUpperCase() + name.slice(1);
+    const content = win.querySelector('.content');
+
+    if (name === 'terminal') content.innerHTML = `
+      <div class="terminal" id="term">
+        <div><strong>htmlOS Terminal</strong> — digite <code>help</code> para começar</div>
+        <div id="pwd" style="margin:6px 0;color:var(--muted);font-size:13px;"></div>
+        <div id="out" style="white-space:pre-wrap;"></div>
+        <div style="margin-top:8px;display:flex;gap:8px">
+          <input id="cmd" placeholder="Digite um comando..." style="flex:1;padding:6px;border-radius:6px;border:1px solid rgba(255,255,255,0.03);background:transparent;color:inherit">
+          <button id="run">Executar</button>
+        </div>
+      </div>
+    `;
+    if (name === 'notes') content.innerHTML = '<textarea style="width:100%;height:100%;background:#071320;color:#bfe9d7;border:none;padding:12px;resize:none;border-radius:8px"></textarea>';
+    if (name === 'settings') content.innerHTML = '<div>Configurações não implementadas 😭</div>';
+
+    win.style.left = (60 + Math.random() * 200) + 'px';
+    win.style.top = (60 + Math.random() * 120) + 'px';
+    win.style.zIndex = ++z;
+    desktop.appendChild(win);
+    addTask(winId, win.querySelector('.title').textContent);
+
+    win.querySelector('[data-action="close"]').addEventListener('click', () => { win.remove(); removeTask(winId); });
+    win.querySelector('[data-action="min"]').addEventListener('click', () => { win.style.display = 'none'; });
+    win.querySelector('[data-action="max"]').addEventListener('click', () => { toggleMax(win); });
+    win.addEventListener('mousedown', () => win.style.zIndex = ++z);
+    win.addEventListener('touchstart', () => win.style.zIndex = ++z);
+
+    makeDraggable(win);
+
+    if (name === 'terminal') wireTerminal(win);
+  }
+
+  // Terminal wiring and commands
+  function wireTerminal(win) {
+    const out = win.querySelector('#out');
+    const cmd = win.querySelector('#cmd');
+    const run = win.querySelector('#run');
+    const pwdEl = win.querySelector('#pwd');
+
+    function refreshPwd() { pwdEl.textContent = 'Diretório: ' + cwd; }
+    refreshPwd();
+
+    function writeLine(t) { out.innerHTML += t + '\n'; out.scrollTop = out.scrollHeight; }
+
+    function runCmd(raw) {
+      if (!raw) return;
+      const s = raw.trim();
+      writeLine('> ' + s);
+      const parts = s.split(' ').filter(Boolean);
+      const c = parts[0].toLowerCase();
+      const rest = parts.slice(1).join(' ');
+
+      if (c === 'help') {
+        writeLine('Comandos: help, time, pwd, ls, cd <dir>, echo <texto>, clear, delete <nome>, mkdir <nome>, touch <nome>, rm, ver, cat');
+      } else if (c === 'ver') {
+        writeLine('htmlOS');
+        writeLine('Versão: Beta 1 Build 134 - Public Beta Build');
+        writeLine('Language Pack version and language: PT-BR - Version 1.0 Finished');
+        writeLine('root: /HTMLSYS');
+      } else if (c === 'time') {
+        writeLine(new Date().toString());
+      } else if (c === 'pwd') {
+        writeLine(cwd);
+      } else if (c === 'ls') {
+        const target = rest || '.';
+        const path = normalizePath(target === '.' ? cwd : target);
+        const res = listDir(path);
+        if (res.error) writeLine('Erro: ' + res.error);
+        else {
+          const lines = res.children.map(it => it.node.type === 'dir' ? it.name + '/' : it.name).join('  ');
+          writeLine(lines || '(vazio)');
+        }
+      } else if (c === 'cd') {
+        const target = rest || '/home/user';
+        const path = normalizePath(target);
+        const node = getNode(path);
+        if (!node) writeLine('cd: diretório não existe: ' + target);
+        else if (node.type !== 'dir') writeLine('cd: não é um diretório: ' + target);
+        else { cwd = path; refreshPwd(); }
+      } else if (c === 'echo') {
+        writeLine(rest);
+      } else if (c === 'clear') {
+        out.innerHTML = '';
+      } else if (c === 'cat') {
+        const target = rest.trim();
+        if (!target) writeLine('cat: falta operando');
+        else {
+          const path = normalizePath(target);
+          const node = getNode(path);
+          if (!node) writeLine('cat: arquivo não encontrado');
+          else if (node.type !== 'file') writeLine('cat: não é um arquivo');
+          else writeLine(node.content || '');
+        }
+      } else if (c === 'mkdir') {
+        const name = rest.trim();
+        if (!name) writeLine('mkdir: falta operando');
+        else {
+          const path = normalizePath(name);
+          const parts = path.split('/').filter(Boolean);
+          const newName = parts.pop();
+          const parentPath = '/' + parts.join('/');
+          const parent = getNode(parentPath === '/' ? '/' : parentPath);
+          if (!parent || parent.type !== 'dir') writeLine('mkdir: caminho inválido');
+          else { parent.children[newName] = { type: 'dir', children: {} }; writeLine('mkdir: ' + newName + ' criado'); }
+        }
+      } else if (c === 'touch') {
+        const name = rest.trim();
+        if (!name) writeLine('touch: falta operando');
+        else {
+          const path = normalizePath(name);
+          const parts = path.split('/').filter(Boolean);
+          const newName = parts.pop();
+          const parentPath = '/' + parts.join('/');
+          const parent = getNode(parentPath === '/' ? '/' : parentPath);
+          if (!parent || parent.type !== 'dir') writeLine('touch: caminho inválido');
+          else { parent.children[newName] = { type: 'file', content: '' }; writeLine('touch: ' + newName + ' criado'); }
+        }
+      } else if (c === 'rm') {
+        const name = rest.trim();
+        if (!name) writeLine('rm: falta operando');
+        else {
+          const path = normalizePath(name);
+          const parts = path.split('/').filter(Boolean);
+          const targetName = parts.pop();
+          const parentPath = '/' + parts.join('/');
+          const parent = getNode(parentPath === '/' ? '/' : parentPath);
+          if (!parent || parent.type !== 'dir') writeLine('rm: caminho inválido');
+          else if (!parent.children[targetName]) writeLine('rm: arquivo não encontrado');
+          else { delete parent.children[targetName]; writeLine('rm: ' + targetName + ' removido'); }
+        }
+      } else if (c === 'delete') {
+        const target = (rest || '').trim().toUpperCase();
+        if (!target) writeLine('delete: falta operando');
+        else if (target === 'HTMLSYS') {
+          // special fatal screen
+          document.documentElement.innerHTML = `<head><meta charset="utf-8"><title>System Failure</title></head><body style="margin:0;background:black;color:white;font-family:monospace;display:flex;align-items:center;justify-content:center"><div style="text-align:center;padding:20px;font-size:16px">System Files Missing.<br><br>Missing Files:<br>syshtmlload.sys<br>systemui.htmlapp<br>uimodules.regrule<br>UIRules.uirules</div></body>`;
+        } else {
+          // try to delete path
+          const path = normalizePath(rest);
+          const parts = path.split('/').filter(Boolean);
+          if (parts.length === 0) writeLine('delete: não pode deletar raiz');
+          else {
+            const name = parts.pop();
+            const parentPath = '/' + parts.join('/');
+            const parent = getNode(parentPath === '/' ? '/' : parentPath);
+            if (!parent || parent.type !== 'dir') writeLine('delete: caminho inválido');
+            else if (!parent.children[name]) writeLine('delete: não encontrado: ' + name);
+            else { delete parent.children[name]; writeLine('delete: ' + name + ' removido'); }
+          }
+        }
+      } else {
+        writeLine('Comando não reconhecido - digite help');
+      }
+    }
+
+    run.addEventListener('click', () => { runCmd(cmd.value); cmd.value = ''; });
+    cmd.addEventListener('keydown', e => { if (e.key === 'Enter') { runCmd(cmd.value); cmd.value = ''; } });
+
+    // focus input automatically
+    cmd.focus();
+  }
+
+  // bind icons and start menu (ensure elements exist)
+  function bindAppButtons() {
+    document.querySelectorAll('.icon').forEach(ic => {
+      ic.addEventListener('click', () => openApp(ic.getAttribute('data-app')));
+      ic.addEventListener('touchstart', ev => { ev.preventDefault(); openApp(ic.getAttribute('data-app')); }, { passive: false });
+    });
+    document.querySelectorAll('#startMenu button[data-app]').forEach(btn => {
+      btn.addEventListener('click', () => openApp(btn.getAttribute('data-app')));
+    });
+  }
+  // small delay to ensure render
+  setTimeout(bindAppButtons, 30);
+
+  // start menu behavior
+  startMenu.classList.add('hidden');
+  startBtn.addEventListener('click', e => { startMenu.classList.toggle('hidden'); e.stopPropagation(); });
+  document.addEventListener('click', e => { if (!startMenu.contains(e.target) && e.target !== startBtn) startMenu.classList.add('hidden'); });
+
+  document.getElementById('logoutBtn').addEventListener('click', () => location.reload());
+});
+</script>
+</body>
+</html>
