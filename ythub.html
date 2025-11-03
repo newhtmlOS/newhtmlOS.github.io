@@ -1,0 +1,190 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
+<title>x1co!OS — YouTube Hub (API v3)</title>
+<style>
+  :root{
+    --bg:#0b1020; --tx:#eaf2ff; --glass:rgba(255,255,255,.08); --bd:rgba(255,255,255,.18); --accent:#22d3ee;
+  }
+  *{ box-sizing:border-box }
+  html,body{ height:100%; margin:0; background:var(--bg); color:var(--tx); font-family:system-ui,Segoe UI,Roboto,Arial,sans-serif }
+  .wrap{ position:fixed; inset:0; display:flex; flex-direction:column; gap:10px; padding:12px }
+  header{ display:flex; gap:10px; align-items:center; flex-wrap:wrap; }
+  input, select{ background:rgba(0,0,0,.25); border:1px solid var(--bd); color:var(--tx); border-radius:10px; padding:10px 12px }
+  input[type="password"], input[type="text"]{ min-width: 160px; }
+  .btn{ padding:10px 14px; border-radius:12px; border:1px solid var(--bd); background:rgba(0,0,0,.35); color:var(--tx); font-weight:700; cursor:pointer }
+  .btn:active{ transform: translateY(1px) }
+  .row{ display:flex; gap:10px; align-items:center; flex-wrap:wrap }
+  .stage{ position:relative; flex:1; min-height:0; display:grid; grid-template-columns: 1fr; grid-template-rows: auto 1fr; gap:10px }
+  .player{ background:#000; border-radius:14px; overflow:hidden; min-height: 180px; position:relative; }
+  .player iframe{ position:absolute; inset:0; width:100%; height:100%; border:0 }
+  .controls{ position:absolute; right:10px; bottom:10px; display:flex; gap:8px; z-index:2 }
+  .grid{ overflow:auto; border:1px solid var(--bd); border-radius:14px; padding:10px; background:var(--glass) }
+  .cards{ display:grid; grid-template-columns: repeat(auto-fill,minmax(220px,1fr)); gap:12px }
+  .card{ background:rgba(0,0,0,.25); border:1px solid var(--bd); border-radius:12px; overflow:hidden; cursor:pointer }
+  .thumb{ position:relative; aspect-ratio:16/9; background:#111 }
+  .thumb img{ width:100%; height:100%; object-fit:cover; display:block }
+  .dur{ position:absolute; right:6px; bottom:6px; padding:3px 6px; font-size:12px; border-radius:8px; background:rgba(0,0,0,.65) }
+  .meta{ padding:8px 10px }
+  .ttl{ font-weight:700; font-size:14px; line-height:1.25; margin:0 0 4px }
+  .chn{ font-size:12px; opacity:.9 }
+  .hint{ font-size:12px; opacity:.85 }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <div class="row">
+      <label>API Key:
+        <input id="apiKey" type="password" placeholder="AIza..." autocomplete="off">
+      </label>
+      <button class="btn" id="saveKey">Salvar</button>
+      <span class="hint">A chave fica só no seu navegador (localStorage).</span>
+    </div>
+    <div class="row">
+      <select id="region">
+        <option value="BR" selected>Região: Brasil (BR)</option>
+        <option value="US">Estados Unidos (US)</option>
+        <option value="PT">Portugal (PT)</option>
+        <option value="MX">México (MX)</option>
+      </select>
+      <button class="btn" id="btnHome">Início (Em alta)</button>
+      <input id="q" type="text" placeholder="Pesquisar no YouTube...">
+      <button class="btn" id="btnSearch">Pesquisar</button>
+    </div>
+  </header>
+
+  <div class="stage">
+    <div class="player" id="playerBox">
+      <iframe id="yt" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" allowfullscreen></iframe>
+      <div class="controls">
+        <button class="btn" id="btnFs">⛶ Tela cheia</button>
+        <button class="btn" id="btnFsLand">⛶↻ Paisagem</button>
+      </div>
+    </div>
+
+    <div class="grid">
+      <div class="cards" id="cards"></div>
+    </div>
+  </div>
+</div>
+
+<script>
+(function(){
+  const $ = s => document.querySelector(s);
+  const apiKeyEl = $('#apiKey');
+  const saveKey = $('#saveKey');
+  const region = $('#region');
+  const btnHome = $('#btnHome');
+  const q = $('#q');
+  const btnSearch = $('#btnSearch');
+  const cards = $('#cards');
+  const yt = $('#yt');
+  const playerBox = $('#playerBox');
+  const btnFs = $('#btnFs');
+  const btnFsLand = $('#btnFsLand');
+
+  // storage
+  apiKeyEl.value = localStorage.getItem('YT_API_KEY') || '';
+  region.value = localStorage.getItem('YT_REGION') || 'BR';
+  saveKey.addEventListener('click', ()=>{
+    localStorage.setItem('YT_API_KEY', apiKeyEl.value.trim());
+    localStorage.setItem('YT_REGION', region.value);
+    alert('Salvo!');
+  });
+  region.addEventListener('change', ()=> localStorage.setItem('YT_REGION', region.value));
+
+  // helpers
+  function fmtISO8601Dur(iso){
+    // PT1H2M10S -> 01:02:10 ; PT4M9S -> 04:09 ; PT50S -> 00:50
+    const m = /PT(?:(\d+)H)?(?:(\d+)M)?(?:(\d+)S)?/.exec(iso||'') || [];
+    const h = +(m[1]||0), mi=+(m[2]||0), s=+(m[3]||0);
+    const pad = n => n<10 ? '0'+n : ''+n;
+    return h ? `${pad(h)}:${pad(mi)}:${pad(s)}` : `${pad(mi)}:${pad(s)}`;
+  }
+  function req(url){
+    return fetch(url).then(r=>{
+      if(!r.ok) throw new Error('HTTP '+r.status);
+      return r.json();
+    });
+  }
+  function setPlayer(id){
+    yt.src = `https://www.youtube.com/embed/${id}?autoplay=1&playsinline=1`;
+  }
+  async function listMostPopular(){
+    const key = apiKeyEl.value.trim(); if(!key){ alert('Informe a API Key.'); return; }
+    const reg = region.value;
+    const url = `https://www.googleapis.com/youtube/v3/videos?part=snippet,contentDetails,statistics&chart=mostPopular&regionCode=${encodeURIComponent(reg)}&maxResults=24&key=${encodeURIComponent(key)}`;
+    const js = await req(url);
+    renderCards(js.items || []);
+  }
+  async function search(){
+    const key = apiKeyEl.value.trim(); if(!key){ alert('Informe a API Key.'); return; }
+    const term = q.value.trim(); if(!term){ q.focus(); return; }
+    // 1) search -> ids
+    const sUrl = `https://www.googleapis.com/youtube/v3/search?part=snippet&maxResults=24&type=video&q=${encodeURIComponent(term)}&key=${encodeURIComponent(key)}`;
+    const sJs = await req(sUrl);
+    const ids = (sJs.items||[]).map(it=> it.id && it.id.videoId).filter(Boolean);
+    if(ids.length === 0){ cards.innerHTML = '<div class="hint">Nada encontrado.</div>'; return; }
+    // 2) details -> durations/thumbnails
+    const dUrl = `https://www.googleapis.com/youtube/v3/videos?part=snippet,contentDetails,statistics&id=${ids.join(',')}&key=${encodeURIComponent(key)}`;
+    const dJs = await req(dUrl);
+    renderCards(dJs.items || []);
+  }
+  function renderCards(items){
+    cards.innerHTML = items.map(it=>{
+      const id = it.id.videoId || it.id; // videos.list vs search+videos.list
+      const sn = it.snippet || {};
+      const cd = it.contentDetails || {};
+      const thumb = (sn.thumbnails && (sn.thumbnails.medium || sn.thumbnails.high || sn.thumbnails.default)) || {};
+      const dur = cd.duration ? fmtISO8601Dur(cd.duration) : '';
+      const title = (sn.title||'').replace(/</g,'&lt;');
+      const ch = (sn.channelTitle||'').replace(/</g,'&lt;');
+      return `<div class="card" data-id="${id}" title="${title} — ${ch}">
+        <div class="thumb">
+          <img loading="lazy" src="${thumb.url||''}" alt="">
+          <div class="dur">${dur}</div>
+        </div>
+        <div class="meta">
+          <div class="ttl">${title}</div>
+          <div class="chn">${ch}</div>
+        </div>
+      </div>`;
+    }).join('');
+  }
+  cards.addEventListener('click', (e)=>{
+    const card = e.target.closest('.card'); if(!card) return;
+    const id = card.getAttribute('data-id');
+    if(id) setPlayer(id);
+  });
+
+  // Fullscreen + Landscape
+  function reqFs(el){
+    const rfs = el.requestFullscreen || el.webkitRequestFullscreen || el.msRequestFullscreen || el.mozRequestFullScreen;
+    if(rfs) return rfs.call(el);
+  }
+  async function fsLandscape(){
+    try{
+      await reqFs(playerBox);
+      if(screen.orientation && screen.orientation.lock){
+        try{ await screen.orientation.lock('landscape'); }catch(e){/* alguns navegadores bloqueiam */}
+      }
+    }catch(e){}
+  }
+  btnFs.addEventListener('click', ()=> reqFs(playerBox));
+  btnFsLand.addEventListener('click', fsLandscape);
+
+  // Actions
+  btnHome.addEventListener('click', listMostPopular);
+  btnSearch.addEventListener('click', search);
+  q.addEventListener('keydown', e=>{ if(e.key==='Enter') search(); });
+
+  // Boot: tenta carregar "Em alta"
+  // (só se houver API key salva)
+  if(apiKeyEl.value) listMostPopular();
+})();
+</script>
+</body>
+</html>
