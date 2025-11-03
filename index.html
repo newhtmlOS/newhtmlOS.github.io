@@ -1533,7 +1533,7 @@ document.addEventListener('DOMContentLoaded', () => {
 </style>
 
 <!-- Store overlay container (no top buttons; fechar pela NAVBAR/Home) -->
-<div id="storeOverlay" class="glass" aria-label="Loja">
+<div id="storeOverlay" style="display:none !important" class="glass" aria-label="Loja">
   <div class="inner"><iframe id="storeFrame" src="" allow="camera; microphone; fullscreen; autoplay; encrypted-media"></iframe></div>
 </div>
 
@@ -1854,6 +1854,91 @@ document.addEventListener('DOMContentLoaded', () => {
 <div id="webAppOverlay" class="glass" aria-label="App">
   <div class="inner"><iframe id="webAppFrame" src="" allow="camera; microphone; fullscreen; autoplay; encrypted-media"></iframe></div>
 </div>
+
+
+<script id="store-unified-webapp">
+(function(){
+  if (window.__storeUnified) return; window.__storeUnified = true;
+
+  function navElem(){ return document.querySelector('#navbar, .navbar, .bottomBar, .navBar, [role="navigation"], [data-role="navbar"]'); }
+  function navHeight(){
+    var el = navElem(); if (el){ var r = el.getBoundingClientRect(); return Math.max(44, Math.round(r.height)); }
+    var v = getComputedStyle(document.documentElement).getPropertyValue('--sys-h') || '64'; var n = parseFloat(v); return isFinite(n)?n:64;
+  }
+  function ensureWebAppBottom(){
+    var ov = document.getElementById('webAppOverlay'); if (!ov) return;
+    var h = navHeight(); ov.style.bottom = h + 'px';
+    var nav = navElem(); var z = 9999; if (nav){ var zi = parseInt(getComputedStyle(nav).zIndex,10); if (isFinite(zi)) z = zi - 1; }
+    ov.style.zIndex = String(z);
+  }
+  function openWebApp(url){
+    ensureWebAppBottom();
+    var ov = document.getElementById('webAppOverlay');
+    var ifr = document.getElementById('webAppFrame');
+    if (!ov || !ifr) return;
+    try { var u = new URL(url, location.href); u.searchParams.set('_t', Date.now()); url = u.toString(); } catch(e){}
+    ifr.src = url; ov.style.display = 'block';
+    try { history.pushState({webapp:true}, '', location.href); } catch(e){}
+  }
+  function closeWebApp(){
+    var ov = document.getElementById('webAppOverlay');
+    var ifr = document.getElementById('webAppFrame');
+    if (ov) ov.style.display = 'none';
+    if (ifr) try{ ifr.src = 'about:blank'; }catch(e){}
+  }
+  window.closeWebApp = closeWebApp;
+
+  // Hook openApp('store') to open store INSIDE webAppOverlay
+  var orig = window.openApp;
+  window.openApp = function(name){
+    if (name === 'store'){
+      openWebApp('store.html');
+      return;
+    }
+    if (typeof orig === 'function') return orig.apply(this, arguments);
+  };
+
+  // When store asks to OPEN_APP, just navigate the SAME iframe to the app
+  window.addEventListener('message', function(ev){
+    var d = ev.data || {};
+    if (d.type === 'OPEN_APP' && d.href){
+      var ifr = document.getElementById('webAppFrame');
+      var ov = document.getElementById('webAppOverlay');
+      if (ifr && ov){
+        try { var u = new URL(d.href, location.href); u.searchParams.set('_t', Date.now()); ifr.src = u.toString(); }
+        catch(e){ ifr.src = d.href; }
+        ov.style.display = 'block';
+      }
+    }
+  });
+
+  // Home/Back/Janela fecham o app
+  window.addEventListener('message', function(ev){
+    var t = ev.data && ev.data.type;
+    if (t === 'NAV_HOME' || t === 'NAV_BACK' || t === 'NAV_WINDOW' || t === 'CLOSE_APP'){
+      closeWebApp();
+    }
+  });
+
+  // Tap na navbar fecha sem bloquear clique
+  function onPointer(e){
+    var ov = document.getElementById('webAppOverlay');
+    if (!ov || ov.style.display !== 'block') return;
+    var h = navHeight();
+    var threshold = (window.innerHeight || document.documentElement.clientHeight) - h - 1;
+    if ((e.clientY || 0) >= threshold){ closeWebApp(); }
+  }
+  window.addEventListener('pointerdown', onPointer, {passive:true});
+  window.addEventListener('touchstart', onPointer, {passive:true});
+  window.addEventListener('mousedown', onPointer, {passive:true});
+
+  window.addEventListener('resize', ensureWebAppBottom);
+  window.addEventListener('orientationchange', ensureWebAppBottom);
+
+  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', ensureWebAppBottom, {once:true});
+  else ensureWebAppBottom();
+})();
+</script>
 
 </body>
 </html>
