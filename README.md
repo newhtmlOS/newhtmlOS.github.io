@@ -6,4 +6,4 @@ the html is on releases or the index.html file
 
 Open Without Download HTML here:
 
-https://xicook.github.io/htmlOS/
+https://newhtmlos.github.io/
