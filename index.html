@@ -1730,5 +1730,130 @@ document.addEventListener('DOMContentLoaded', () => {
 })();
 </script>
 
+
+<style id="webapp-overlay-css">
+  /* Overlay de APP (tela cheia) que respeita a navbar */
+  #webAppOverlay{
+    position: fixed; left:0; right:0; top:0;
+    bottom: var(--sys-h, 64px);
+    display:none;
+    z-index: 9998; /* navbar deve ficar acima */
+    background: var(--glass-bg, rgba(15,23,42,.35));
+    border-top: 1px solid var(--glass-brd, rgba(148,163,184,.25));
+    -webkit-backdrop-filter: blur(var(--glass-blur,14px)) saturate(var(--glass-sat,1.2));
+    backdrop-filter: blur(var(--glass-blur,14px)) saturate(var(--glass-sat,1.2));
+    pointer-events: none;  /* deixa navbar clicável */
+  }
+  #webAppOverlay .inner{ position:absolute; inset:0; }
+  #webAppOverlay iframe{
+    position:absolute; inset:0; border:0; width:100%; height:100%;
+    background: transparent;
+    pointer-events: auto; /* iframe continua clicável */
+  }
+</style>
+
+
+<script id="webapp-overlay-js">
+(function(){
+  if (window.__webAppOverlay) return; window.__webAppOverlay = true;
+
+  function navElem(){
+    return document.querySelector('#navbar, .navbar, .bottomBar, .navBar, [role="navigation"], [data-role="navbar"]');
+  }
+  function navHeight(){
+    var el = navElem();
+    if (el){
+      var r = el.getBoundingClientRect();
+      return Math.max(44, Math.round(r.height));
+    }
+    var v = getComputedStyle(document.documentElement).getPropertyValue('--sys-h') || '64';
+    var n = parseFloat(v); return isFinite(n) ? n : 64;
+  }
+  function applyBottom(elemId){
+    var el = document.getElementById(elemId); if (!el) return;
+    el.style.bottom = navHeight() + 'px';
+    // manter z-index abaixo da navbar
+    var nav = navElem(); var z = 9999;
+    if (nav){
+      var zi = parseInt(getComputedStyle(nav).zIndex, 10);
+      if (isFinite(zi)) z = zi - 1;
+    }
+    el.style.zIndex = String(z);
+  }
+
+  function openWebApp(href, title){
+    var ov = document.getElementById('webAppOverlay');
+    var ifr = document.getElementById('webAppFrame');
+    if (!ov || !ifr) return;
+    applyBottom('webAppOverlay');
+    // força sem cache pra desenvolvimento; se quiser cache, tire o carimbo
+    var url = href;
+    try { 
+      var u = new URL(href, location.href);
+      u.searchParams.set('_t', Date.now()); 
+      url = u.toString();
+    } catch(e){}
+    ifr.src = url;
+    ov.style.display = 'block';
+    try { history.pushState({webapp:true}, '', location.href); } catch(e){}
+  }
+  function closeWebApp(){
+    var ov = document.getElementById('webAppOverlay');
+    var ifr = document.getElementById('webAppFrame');
+    if (ov) ov.style.display = 'none';
+    if (ifr) try{ ifr.src = 'about:blank'; }catch(e){}
+  }
+  window.closeWebApp = closeWebApp;
+
+  // Recebe pedido da STORE para abrir app
+  window.addEventListener('message', function(ev){
+    var d = ev.data || {};
+    if (d.type === 'OPEN_APP' && d.href){
+      // fecha a Store antes
+      try{ if (typeof window.closeStore === 'function') window.closeStore(); else {
+        var s = document.getElementById('storeOverlay'); if (s) s.style.display='none';
+      }}catch(e){}
+      openWebApp(d.href, d.title);
+    }
+  });
+
+  // Home/Voltar/Janela fecham o app
+  function onNavMsg(ev){
+    var t = ev.data && ev.data.type;
+    if (t === 'NAV_HOME' || t === 'NAV_BACK' || t === 'NAV_WINDOW' || t === 'CLOSE_APP'){
+      closeWebApp();
+    }
+  }
+  window.addEventListener('message', onNavMsg);
+
+  // Um toque na faixa da navbar fecha o app sem comer o clique
+  function onPointer(e){
+    var ov = document.getElementById('webAppOverlay');
+    if (!ov || ov.style.display !== 'block') return;
+    var h = navHeight();
+    var threshold = (window.innerHeight || document.documentElement.clientHeight) - h - 1;
+    if ((e.clientY || 0) >= threshold){
+      closeWebApp(); // não cancela o evento -> navbar age normalmente
+    }
+  }
+  window.addEventListener('pointerdown', onPointer, {passive:true});
+  window.addEventListener('touchstart', onPointer, {passive:true});
+  window.addEventListener('mousedown', onPointer, {passive:true});
+
+  // Ajustar quando abre e em rotação
+  window.addEventListener('resize', function(){ applyBottom('webAppOverlay'); });
+  window.addEventListener('orientationchange', function(){ applyBottom('webAppOverlay'); });
+
+  // Expor um helper opcional pra abrir URL arbitrária
+  window.openUrlApp = openWebApp;
+})();
+</script>
+
+
+<!-- Overlay para APPS abertos a partir da Loja -->
+<div id="webAppOverlay" class="glass" aria-label="App">
+  <div class="inner"><iframe id="webAppFrame" src="" allow="camera; microphone; fullscreen; autoplay; encrypted-media"></iframe></div>
+</div>
+
 </body>
 </html>
