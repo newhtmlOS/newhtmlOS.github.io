@@ -1,0 +1,79 @@
+<!doctype html>
+<html lang="pt-br">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Mark that you were here! • x1coOS</title>
+<meta name="color-scheme" content="dark light">
+<style>
+:root{ --bg:#0b1020; --tx:#eaf2ff; --muted:#9fb3d9; --brd:#243055; --accent:#5aa9ff; }
+*{box-sizing:border-box} html,body{height:100%;margin:0;font-family:system-ui,Segoe UI,Roboto,Arial;background:linear-gradient(180deg,#0b1020,#0f1730);color:var(--tx)}
+.wrap{min-height:100%;display:flex;flex-direction:column}
+.top{display:flex;gap:8px;align-items:center;padding:12px;border-bottom:1px solid var(--brd);background:#111a33}
+h1{font-size:16px;margin:0} .spacer{flex:1}
+.main{padding:16px;display:grid;gap:16px}
+.panel{border:1px solid var(--brd);border-radius:16px;padding:16px;background:rgba(255,255,255,.03)}
+.input{height:40px;padding:0 10px;border-radius:10px;border:1px solid var(--brd);background:#0f1a39;color:var(--tx)}
+.btn{height:40px;padding:0 14px;border-radius:10px;border:1px solid var(--brd);background:rgba(255,255,255,.06);color:var(--tx);cursor:pointer}
+.list{display:grid;gap:8px}
+.item{padding:8px 12px;border:1px solid var(--brd);border-radius:10px;background:rgba(255,255,255,.04);display:flex;justify-content:space-between;align-items:center}
+.notice{color:var(--muted);font-size:13px}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="top"><h1>Mark that you were here!</h1><div class="spacer"></div><button class="btn" onclick="closeMe()">Fechar</button></div>
+  <div class="main">
+    <div class="panel">
+      <div class="notice">Assine o mural deste dispositivo com um Nick. (Opcional) você pode configurar um <b>Webhook público</b> para enviar os registros (JSON POST). Se não configurar, fica só local.</div>
+      <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:8px">
+        <input id="nick" class="input" placeholder="Seu nick">
+        <button class="btn" onclick="mark()">Marcar presença</button>
+      </div>
+      <div class="notice" style="margin-top:8px">Webhook (opcional, precisa aceitar CORS):</div>
+      <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:4px">
+        <input id="hook" class="input" style="min-width:320px" placeholder="https://seu-endpoint.com/collect">
+        <button class="btn" onclick="saveHook()">Salvar Webhook</button>
+      </div>
+    </div>
+    <div class="panel">
+      <div class="notice">Assinaturas locais</div>
+      <div id="list" class="list"></div>
+    </div>
+  </div>
+</div>
+<script>
+const KEY="x1co_marks", HKEY="x1co_marks_webhook";
+function read(){ try{return JSON.parse(localStorage.getItem(KEY)||"[]");}catch(_){return [];} }
+function write(v){ localStorage.setItem(KEY, JSON.stringify(v)); }
+function render(){
+  const list = document.getElementById("list"); list.innerHTML="";
+  read().slice().reverse().forEach(e=>{
+    const div = document.createElement("div"); div.className="item";
+    div.innerHTML = `<span>${e.nick} <span style="color:#9fb3d9;font-size:12px">• ${new Date(e.at).toLocaleString()}</span></span>
+                     <span style="opacity:.7">${e.id}</span>`;
+    list.appendChild(div);
+  });
+  document.getElementById("hook").value = localStorage.getItem(HKEY)||"";
+}
+function saveHook(){ localStorage.setItem(HKEY, document.getElementById("hook").value.trim()); alert("Webhook salvo."); }
+async function mark(){
+  const nick = (document.getElementById("nick").value||"").trim() || "Anônimo";
+  const e = { id: Math.random().toString(36).slice(2,8),
+              nick, at: Date.now(), ua: navigator.userAgent };
+  const all = read(); all.push(e); write(all); render();
+  const hook = localStorage.getItem(HKEY);
+  if (hook){
+    try{
+      const res = await fetch(hook, {method:"POST", headers:{"Content-Type":"application/json"}, body: JSON.stringify(e)});
+      if (!res.ok) throw new Error("HTTP "+res.status);
+    }catch(err){
+      console.warn("Falha no webhook:", err);
+      alert("Falha ao enviar para o Webhook (CORS/erro). Mas foi salvo local.");
+    }
+  }
+}
+function closeMe(){ try{ parent.postMessage({type:"CLOSE_APP"}, "*"); }catch(e){} }
+render();
+</script>
+</body>
+</html>

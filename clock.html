@@ -1,0 +1,165 @@
+<!doctype html>
+<html lang="pt-br">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Relógio • x1coOS</title>
+<meta name="color-scheme" content="dark light">
+<style>
+:root{ --bg:#0b1020; --tx:#eaf2ff; --muted:#9fb3d9; --brd:#243055; --accent:#5aa9ff; }
+*{box-sizing:border-box} html,body{height:100%;margin:0;font-family:system-ui,Segoe UI,Roboto,Arial;background:linear-gradient(180deg,#0b1020,#0f1730);color:var(--tx)}
+.wrap{min-height:100%;display:flex;flex-direction:column}
+.top{display:flex;gap:8px;align-items:center;padding:12px;border-bottom:1px solid var(--brd);background:#111a33}
+h1{font-size:16px;margin:0} .spacer{flex:1}
+.tabs{display:flex;gap:8px;padding:10px;border-bottom:1px solid var(--brd);background:#0e1730}
+.tab{padding:8px 12px;border-radius:999px;border:1px solid var(--brd);cursor:pointer}
+.tab.active{background:linear-gradient(135deg,#3b82f6,#8b5cf6);border:0}
+.view{padding:16px;display:none} .view.active{display:block}
+.panel{border:1px solid var(--brd);border-radius:16px;padding:16px;background:rgba(255,255,255,.03)}
+.btn{height:40px;padding:0 14px;border-radius:10px;border:1px solid var(--brd);background:rgba(255,255,255,.06);color:var(--tx);cursor:pointer}
+.grid{display:grid;gap:12px;grid-template-columns:repeat(auto-fit,minmax(220px,1fr))}
+.big{font-size:40px;letter-spacing:1px}
+.input{height:40px;padding:0 10px;border-radius:10px;border:1px solid var(--brd);background:#0f1a39;color:var(--tx)}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="top"><h1>Relógio</h1><div class="spacer"></div><button class="btn" onclick="closeMe()">Fechar</button></div>
+  <div class="tabs">
+    <div class="tab active" data-v="crono">Cronômetro</div>
+    <div class="tab" data-v="timer">Timer</div>
+    <div class="tab" data-v="agenda">Agendar</div>
+  </div>
+
+  <section class="view active" id="crono">
+    <div class="panel grid">
+      <div>
+        <div id="cronoTime" class="big">00:00.000</div>
+        <div style="display:flex;gap:8px;margin-top:8px">
+          <button class="btn" onclick="crono.start()">Iniciar</button>
+          <button class="btn" onclick="crono.lap()">Volta</button>
+          <button class="btn" onclick="crono.stop()">Parar</button>
+          <button class="btn" onclick="crono.reset()">Zerar</button>
+        </div>
+        <ul id="laps" style="margin-top:10px;font-size:13px;color:var(--muted)"></ul>
+      </div>
+    </div>
+  </section>
+
+  <section class="view" id="timer">
+    <div class="panel grid">
+      <div>
+        <label>Minutos:</label>
+        <input id="tMin" class="input" type="number" min="0" value="0">
+        <label>Segundos:</label>
+        <input id="tSec" class="input" type="number" min="0" max="59" value="10">
+        <div style="display:flex;gap:8px;margin-top:8px">
+          <button class="btn" onclick="startTimer()">Iniciar</button>
+          <button class="btn" onclick="stopTimer()">Parar</button>
+          <button class="btn" onclick="resetTimer()">Zerar</button>
+        </div>
+        <div id="timerOut" class="big">00:10</div>
+      </div>
+    </div>
+  </section>
+
+  <section class="view" id="agenda">
+    <div class="panel grid">
+      <div>
+        <label>Data e hora do lembrete</label><br>
+        <input id="dtime" class="input" type="datetime-local">
+        <div style="display:flex;gap:8px;margin-top:8px">
+          <button class="btn" onclick="schedule()">Agendar</button>
+        </div>
+        <p class="notice" style="color:var(--muted)">O lembrete toca um beep e mostra alerta <b>enquanto esta página estiver aberta</b>.</p>
+        <ul id="sched" style="font-size:13px;color:var(--muted)"></ul>
+      </div>
+    </div>
+  </section>
+</div>
+
+<script>
+document.querySelectorAll(".tab").forEach(t => t.addEventListener("click", () => {
+  document.querySelectorAll(".tab").forEach(e=>e.classList.remove("active"));
+  document.querySelectorAll(".view").forEach(e=>e.classList.remove("active"));
+  t.classList.add("active");
+  document.getElementById(t.dataset.v).classList.add("active");
+}));
+
+function closeMe(){ try{ parent.postMessage({type:"CLOSE_APP"}, "*"); }catch(e){} }
+
+const crono = (function(){
+  let startAt = 0, running = false, raf = 0, elapsed = 0, laps=[];
+  const out = document.getElementById("cronoTime");
+  const ul = document.getElementById("laps");
+  function fmt(ms){
+    const m = Math.floor(ms/60000), s = Math.floor((ms%60000)/1000), ms3 = ms%1000;
+    return (m+'').padStart(2,'0')+':'+(s+'').padStart(2,'0')+'.'+(ms3+'').padStart(3,'0');
+  }
+  function tick(ts){
+    if (running){ elapsed = Date.now() - startAt; out.textContent = fmt(elapsed); raf = requestAnimationFrame(tick); }
+  }
+  return {
+    start(){ if(!running){ running=true; startAt=Date.now()-elapsed; raf=requestAnimationFrame(tick);} },
+    stop(){ running=false; cancelAnimationFrame(raf); },
+    reset(){ running=false; elapsed=0; out.textContent='00:00.000'; ul.innerHTML=''; laps=[]; },
+    lap(){
+      if(!running) return;
+      laps.push(elapsed);
+      const li = document.createElement("li"); li.textContent = "Volta "+laps.length+": "+fmt(elapsed);
+      ul.appendChild(li);
+    }
+  };
+})();
+
+let timerId=0, left=10;
+function fmtTimer(sec){ const m=Math.floor(sec/60), s=sec%60; return (m+'').padStart(2,'0')+':'+(s+'').padStart(2,'0'); }
+function beep(){
+  try{
+    const a = new (window.AudioContext||window.webkitAudioContext)();
+    const o = a.createOscillator(); const g = a.createGain();
+    o.connect(g); g.connect(a.destination);
+    o.type='sine'; o.frequency.value=880; g.gain.setValueAtTime(0.001,a.currentTime);
+    g.gain.exponentialRampToValueAtTime(0.2,a.currentTime+0.02);
+    o.start();
+    setTimeout(()=>{ g.gain.exponentialRampToValueAtTime(0.0001,a.currentTime+0.3); o.stop(a.currentTime+0.35); }, 300);
+  }catch(e){}
+}
+function updateTimer(){ document.getElementById("timerOut").textContent = fmtTimer(left); }
+function startTimer(){
+  const m = parseInt(document.getElementById("tMin").value||'0',10);
+  const s = parseInt(document.getElementById("tSec").value||'0',10);
+  left = Math.max(0, m*60 + s);
+  updateTimer();
+  clearInterval(timerId);
+  timerId = setInterval(()=>{
+    left--; updateTimer();
+    if(left<=0){ clearInterval(timerId); beep(); alert("Tempo esgotado!"); }
+  }, 1000);
+}
+function stopTimer(){ clearInterval(timerId); }
+function resetTimer(){ clearInterval(timerId); left=10; updateTimer(); }
+updateTimer();
+
+const scheduled = [];
+function schedule(){
+  const dt = document.getElementById("dtime").value;
+  if(!dt){ alert("Escolha data e hora."); return; }
+  const when = new Date(dt).getTime();
+  const now = Date.now();
+  const delta = when - now;
+  if (delta <= 0){ alert("Escolha um horário no futuro."); return; }
+  const id = setTimeout(()=>{ beep(); alert("Lembrete! "+ new Date(when).toLocaleString()); }, delta);
+  scheduled.push({when, id});
+  renderSched();
+}
+function renderSched(){
+  const ul = document.getElementById("sched"); ul.innerHTML="";
+  scheduled.forEach((s,i)=>{
+    const li = document.createElement("li");
+    li.textContent = (i+1)+") "+new Date(s.when).toLocaleString();
+    ul.appendChild(li);
+  });
+}
+</script>
+</body>
+</html>

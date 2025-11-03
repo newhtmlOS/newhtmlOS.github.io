@@ -1,0 +1,76 @@
+<!doctype html>
+<html lang="pt-br">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Jogo da Velha • x1coOS</title>
+<meta name="color-scheme" content="dark light">
+<style>
+:root{ --bg:#0b1020; --tx:#eaf2ff; --muted:#9fb3d9; --brd:#243055; --accent:#5aa9ff; }
+*{box-sizing:border-box} html,body{height:100%;margin:0;font-family:system-ui,Segoe UI,Roboto,Arial;background:linear-gradient(180deg,#0b1020,#0f1730);color:var(--tx)}
+.wrap{min-height:100%;display:flex;flex-direction:column}
+.top{display:flex;gap:8px;align-items:center;padding:12px;border-bottom:1px solid var(--brd);background:#111a33}
+h1{font-size:16px;margin:0} .spacer{flex:1}
+.main{display:grid;place-items:center;padding:20px}
+.board{display:grid;grid-template-columns:repeat(3,100px);grid-template-rows:repeat(3,100px);gap:8px}
+.cell{width:100px;height:100px;display:grid;place-items:center;font-size:54px;background:#121a33;border:1px solid var(--brd);border-radius:12px;cursor:pointer}
+.info{margin-top:16px;text-align:center;color:var(--muted)}
+.btn{height:40px;padding:0 14px;border-radius:10px;border:1px solid var(--brd);background:rgba(255,255,255,.06);color:var(--tx);cursor:pointer}
+.score{display:flex; gap:16px; justify-content:center; color:var(--muted); margin-top:8px}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="top"><h1>Jogo da Velha</h1><div class="spacer"></div><button class="btn" onclick="closeMe()">Fechar</button><button class="btn" onclick="reset()">Reiniciar</button></div>
+  <div class="main">
+    <div class="board" id="board"></div>
+    <div class="info" id="info">Vez de: X</div>
+    <div class="score"><div>X: <span id="sx">0</span></div><div>O: <span id="so">0</span></div><div>Empates: <span id="sd">0</span></div></div>
+  </div>
+</div>
+<script>
+const boardEl = document.getElementById("board");
+const info = document.getElementById("info");
+const sx = document.getElementById("sx"), so = document.getElementById("so"), sd = document.getElementById("sd");
+let grid, turn, scores = JSON.parse(localStorage.getItem("ttt_scores")||'{"X":0,"O":0,"D":0}');
+
+function closeMe(){ try{ parent.postMessage({type:"CLOSE_APP"}, "*"); }catch(e){} }
+
+function start(){
+  grid = Array(9).fill("");
+  turn = "X"; info.textContent = "Vez de: "+turn;
+  boardEl.innerHTML = "";
+  for(let i=0;i<9;i++){
+    const c = document.createElement("div");
+    c.className = "cell";
+    c.addEventListener("click", ()=>play(i));
+    boardEl.appendChild(c);
+  }
+  sx.textContent = scores.X; so.textContent = scores.O; sd.textContent = scores.D;
+}
+function play(i){
+  if(grid[i]) return;
+  grid[i] = turn;
+  boardEl.children[i].textContent = turn;
+  const w = winner();
+  if(w){
+    info.textContent = "Vencedor: "+w;
+    if(w==="X") scores.X++; else scores.O++;
+    localStorage.setItem("ttt_scores", JSON.stringify(scores));
+    setTimeout(start, 1200);
+    return;
+  }
+  if(grid.every(Boolean)){ info.textContent="Empate!"; scores.D++; localStorage.setItem("ttt_scores", JSON.stringify(scores)); setTimeout(start, 1000); return; }
+  turn = (turn==="X") ? "O" : "X";
+  info.textContent = "Vez de: "+turn;
+}
+function winner(){
+  const L = [[0,1,2],[3,4,5],[6,7,8],[0,3,6],[1,4,7],[2,5,8],[0,4,8],[2,4,6]];
+  for(const [a,b,c] of L){ if(grid[a] && grid[a]===grid[b] && grid[a]===grid[c]) return grid[a]; }
+  return null;
+}
+function reset(){ scores={X:0,O:0,D:0}; localStorage.setItem("ttt_scores", JSON.stringify(scores)); start(); }
+
+start();
+</script>
+</body>
+</html>

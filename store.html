@@ -1,0 +1,138 @@
+<!doctype html>
+<html lang="pt-br">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, viewport-fit=cover">
+<title>x1coOS • Loja de Apps</title>
+<meta name="color-scheme" content="dark light">
+<style>
+:root{
+  --bg:#0b1020; --tx:#eaf2ff; --muted:#a9b8d6; --border:#243055; --accent:#5aa9ff;
+  --glass: rgba(15,23,42,.35); --brd: rgba(148,163,184,.25);
+}
+*{box-sizing:border-box}
+html,body{height:100%;margin:0;font-family:system-ui,Segoe UI,Roboto,Arial;background:linear-gradient(180deg,#0b1020,#0e1733);color:var(--tx)}
+.wrap{min-height:100%;padding:16px;display:flex;flex-direction:column;gap:12px}
+.top{display:flex;gap:12px;align-items:center}
+.logo{width:28px;height:28px;border-radius:8px;background:linear-gradient(135deg,#5aa9ff,#a78bfa)}
+h1{font-size:18px;margin:0}
+.search{margin-left:auto;display:flex;gap:8px}
+.search input{height:40px;padding:0 12px;border-radius:12px;border:1px solid var(--border);background:#0f1a39;color:var(--tx);min-width:220px}
+.tabs{display:flex;gap:8px;flex-wrap:wrap}
+.tab{padding:8px 12px;border-radius:999px;border:1px solid var(--brd);background:var(--glass);cursor:pointer}
+.tab.active{background:linear-gradient(135deg,#3b82f6,#8b5cf6);border:0}
+.grid{display:grid;gap:12px;grid-template-columns:repeat(auto-fill,minmax(220px,1fr))}
+.card{border:1px solid var(--brd);background:var(--glass);border-radius:16px;overflow:hidden;display:flex;flex-direction:column}
+.card .thumb{height:120px;background:#0a132a;display:grid;place-items:center}
+.card .thumb img{width:64px;height:64px;border-radius:14px;border:1px solid #1f2a55;background:#1a234a;object-fit:cover}
+.card .body{padding:12px;display:flex;flex-direction:column;gap:6px}
+.card h3{margin:0;font-size:16px}
+.card p{margin:0;color:var(--muted);font-size:13px}
+.card .row{display:flex;gap:8px;margin-top:8px;align-items:center}
+.btn{height:36px;padding:0 12px;border-radius:10px;border:1px solid var(--brd);background:rgba(255,255,255,.06);color:var(--tx);cursor:pointer}
+.btn.primary{background:linear-gradient(135deg,#3b82f6,#8b5cf6);border:0}
+.notice{font-size:12px;color:var(--muted)}
+.footer{margin-top:auto;display:flex;justify-content:space-between;align-items:center;color:var(--muted);font-size:12px}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="top">
+    <div class="logo"></div>
+    <h1>Loja de Apps</h1>
+    <div class="search">
+      <input id="q" placeholder="Pesquisar apps…">
+    </div>
+  </div>
+
+  <div class="tabs">
+    <div class="tab active" data-cat="all">Todos</div>
+    <div class="tab" data-cat="Tools">Ferramentas</div>
+    <div class="tab" data-cat="Games">Jogos</div>
+    <div class="tab" data-cat="UI">UI</div>
+    <div class="tab" data-cat="Useless">Useless</div>
+  </div>
+
+  <div class="grid" id="grid"></div>
+
+  <div class="footer">
+    <div>Apps instalados ficam salvos só neste dispositivo (localStorage).</div>
+    <div class="notice">Dica: se estiver dentro do OS, o botão <b>Abrir</b> abre em janela.</div>
+  </div>
+</div>
+
+<script>
+const manifest = [
+  { id:"clock", title:"Relógio", file:"clock.html", category:"Tools",
+    icon:"data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='128' height='128'><circle cx='64' cy='64' r='58' fill='%231a264a' stroke='%234a5fb0' stroke-width='6'/><line x1='64' y1='64' x2='64' y2='28' stroke='%23a6c1ff' stroke-width='8' stroke-linecap='round'/><line x1='64' y1='64' x2='92' y2='64' stroke='%23a6c1ff' stroke-width='8' stroke-linecap='round'/></svg>",
+    desc:"Timer, Cronômetro e Agendar lembrete local." },
+  { id:"tictactoe", title:"Jogo da Velha", file:"tictactoe.html", category:"Games",
+    icon:"data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='128' height='128'><rect width='128' height='128' fill='%231a264a'/><line x1='42' y1='16' x2='42' y2='112' stroke='%234a5fb0' stroke-width='8'/><line x1='86' y1='16' x2='86' y2='112' stroke='%234a5fb0' stroke-width='8'/><line x1='16' y1='42' x2='112' y2='42' stroke='%234a5fb0' stroke-width='8'/><line x1='16' y1='86' x2='112' y2='86' stroke='%234a5fb0' stroke-width='8'/></svg>",
+    desc:"Clássico 3×3 com placar e reiniciar." },
+  { id:"wallpaper", title:"Local Wallpaper", file:"wallpaper.html", category:"UI",
+    icon:"data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='128' height='128'><defs><linearGradient id='g' x1='0' y1='0' x2='1' y2='1'><stop offset='0' stop-color='%235aa9ff'/><stop offset='1' stop-color='%23a78bfa'/></linearGradient></defs><rect width='128' height='128' fill='url(%23g)'/></svg>",
+    desc:"Escolha uma imagem do dispositivo para ser o fundo do x1coOS." },
+  { id:"markhere", title:"Mark that you were here!", file:"mark.html", category:"Useless",
+    icon:"data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='128' height='128'><rect width='128' height='128' rx='20' fill='%231a264a' stroke='%234a5fb0' stroke-width='6'/><text x='64' y='76' font-size='28' text-anchor='middle' fill='%23a6c1ff'>Hi!</text></svg>",
+    desc:"Assine o mural local com um Nick. (Opcional) envia para um webhook público." }
+];
+const key = "x1co_store_installed";
+function readInstalled(){ try { return JSON.parse(localStorage.getItem(key) || "[]"); } catch(_) { return []; } }
+function writeInstalled(list){ localStorage.setItem(key, JSON.stringify(list)); }
+function isInstalled(id){ return readInstalled().includes(id); }
+function render(cat="all", q=""){
+  const grid = document.getElementById("grid");
+  grid.innerHTML = "";
+  const qn = q.trim().toLowerCase();
+  manifest
+    .filter(a => (cat==="all" || a.category===cat))
+    .filter(a => !qn || a.title.toLowerCase().includes(qn) || a.desc.toLowerCase().includes(qn))
+    .forEach(app => {
+      const card = document.createElement("div");
+      card.className = "card";
+      card.innerHTML = `
+        <div class="thumb"><img alt=""></div>
+        <div class="body">
+          <h3>${app.title}</h3>
+          <p>${app.desc}</p>
+          <div class="row">
+            <button class="btn ${isInstalled(app.id) ? '' : 'primary'}" data-action="install">${isInstalled(app.id) ? 'Desinstalar' : 'Instalar'}</button>
+            <button class="btn" data-action="open">Abrir</button>
+            <span class="notice">${app.category}</span>
+          </div>
+        </div>`;
+      card.querySelector(".thumb img").src = app.icon;
+      card.querySelector('[data-action="install"]').onclick = () => {
+        const list = readInstalled();
+        if (isInstalled(app.id)){ writeInstalled(list.filter(id => id !== app.id)); }
+        else { list.push(app.id); writeInstalled(list); }
+        render(cat, q);
+        try { parent.postMessage({type:"STORE_CHANGED", apps: readInstalled()}, "*"); } catch(e){}
+      };
+      card.querySelector('[data-action="open"]').onclick = () => openApp(app);
+      grid.appendChild(card);
+    });
+}
+function openApp(app){
+  const href = app.file + "?from=store";
+  if (window.parent && window.parent !== window){
+    window.parent.postMessage({type:"OPEN_APP", href, title: app.title}, "*");
+  } else {
+    location.href = href;
+  }
+}
+document.querySelectorAll(".tab").forEach(tab => {
+  tab.addEventListener("click", () => {
+    document.querySelectorAll(".tab").forEach(t => t.classList.remove("active"));
+    tab.classList.add("active");
+    render(tab.dataset.cat, document.getElementById("q").value || "");
+  });
+});
+document.getElementById("q").addEventListener("input", (e)=>{
+  const active = document.querySelector(".tab.active")?.dataset.cat || "all";
+  render(active, e.target.value);
+});
+render();
+</script>
+</body>
+</html>

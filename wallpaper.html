@@ -1,0 +1,68 @@
+<!doctype html>
+<html lang="pt-br">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Local Wallpaper • x1coOS</title>
+<meta name="color-scheme" content="dark light">
+<style>
+:root{ --bg:#0b1020; --tx:#eaf2ff; --muted:#9fb3d9; --brd:#243055; --accent:#5aa9ff; }
+*{box-sizing:border-box} html,body{height:100%;margin:0;font-family:system-ui,Segoe UI,Roboto,Arial;background:linear-gradient(180deg,#0b1020,#0f1730);color:var(--tx)}
+.wrap{min-height:100%;display:flex;flex-direction:column}
+.top{display:flex;gap:8px;align-items:center;padding:12px;border-bottom:1px solid var(--brd);background:#111a33}
+h1{font-size:16px;margin:0} .spacer{flex:1}
+.main{padding:16px;display:grid;gap:16px}
+.panel{border:1px solid var(--brd);border-radius:16px;padding:16px;background:rgba(255,255,255,.03)}
+.input{height:40px;padding:0 10px;border-radius:10px;border:1px solid var(--brd);background:#0f1a39;color:var(--tx)}
+.btn{height:40px;padding:0 14px;border-radius:10px;border:1px solid var(--brd);background:rgba(255,255,255,.06);color:var(--tx);cursor:pointer}
+.preview{width:100%;max-width:520px;aspect-ratio:16/9;border-radius:16px;border:1px dashed var(--brd);display:grid;place-items:center;background:#0a132a;overflow:hidden}
+.preview img{width:100%;height:100%;object-fit:cover}
+.notice{color:var(--muted);font-size:13px}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="top"><h1>Local Wallpaper</h1><div class="spacer"></div><button class="btn" onclick="closeMe()">Fechar</button></div>
+  <div class="main">
+    <div class="panel">
+      <div class="notice">Escolha uma imagem do dispositivo para usar como fundo do x1coOS neste aparelho.</div>
+      <div style="display:flex;gap:12px;align-items:center;flex-wrap:wrap;margin-top:8px">
+        <input id="file" class="input" type="file" accept="image/*">
+        <button class="btn" onclick="save()">Salvar</button>
+        <button class="btn" onclick="clearWP()">Limpar</button>
+      </div>
+      <div class="preview" style="margin-top:12px"><img id="prev" alt="prévia"></div>
+      <div class="notice">Dica: o OS pode ler a imagem do <code>localStorage</code> (chave <b>x1co_wallpaper</b>). Se estiver dentro do OS, já aplico automaticamente via <code>postMessage</code>.</div>
+    </div>
+  </div>
+</div>
+<script>
+let dataUrl=null;
+const prev = document.getElementById("prev");
+document.getElementById("file").addEventListener("change", async (e)=>{
+  const f = e.target.files?.[0]; if(!f) return;
+  const url = URL.createObjectURL(f);
+  prev.src = url;
+  const img = new Image(); img.onload = ()=>{
+    const c = document.createElement("canvas");
+    c.width = img.naturalWidth; c.height = img.naturalHeight;
+    c.getContext("2d").drawImage(img,0,0);
+    dataUrl = c.toDataURL("image/jpeg", 0.92);
+    URL.revokeObjectURL(url);
+  };
+  img.src = url;
+});
+function save(){
+  if(!dataUrl){ alert("Escolha uma imagem primeiro."); return; }
+  localStorage.setItem("x1co_wallpaper", dataUrl);
+  try{ parent.postMessage({type:"SET_WALLPAPER", dataUrl}, "*"); }catch(e){}
+  alert("Wallpaper salvo!");
+}
+function clearWP(){
+  localStorage.removeItem("x1co_wallpaper"); dataUrl=null; prev.removeAttribute("src");
+  try{ parent.postMessage({type:"SET_WALLPAPER", dataUrl:null}, "*"); }catch(e){}
+  alert("Wallpaper limpo.");
+}
+function closeMe(){ try{ parent.postMessage({type:"CLOSE_APP"}, "*"); }catch(e){} }
+</script>
+</body>
+</html>
