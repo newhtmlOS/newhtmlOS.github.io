@@ -1512,5 +1512,223 @@ document.addEventListener('DOMContentLoaded', () => {
 })();
 </script>
 
+
+<style id="store-glass-css-v2">
+  /* Fullscreen overlay that DOES NOT cover the bottom navbar */
+  #storeOverlay{
+    position: fixed; left:0; right:0; top:0;
+    bottom: var(--sys-h, 64px);           /* deixa a navbar livre para clique */
+    z-index: 9998;                        /* menor que a navbar */
+    display:none;
+    background: var(--glass-bg, rgba(15,23,42,.35));
+    border-top: 1px solid var(--glass-brd, rgba(148,163,184,.25));
+    -webkit-backdrop-filter: blur(var(--glass-blur,14px)) saturate(var(--glass-sat,1.2));
+    backdrop-filter: blur(var(--glass-blur,14px)) saturate(var(--glass-sat,1.2));
+  }
+  #storeOverlay .inner{ position:absolute; inset:0; }
+  #storeOverlay iframe{
+    position:absolute; inset:0;
+    width:100%; height:100%; border:0; background:transparent;
+  }
+</style>
+
+<!-- Store overlay container (no top buttons; fechar pela NAVBAR/Home) -->
+<div id="storeOverlay" class="glass" aria-label="Loja">
+  <div class="inner"><iframe id="storeFrame" src="" allow="camera; microphone; fullscreen; autoplay; encrypted-media"></iframe></div>
+</div>
+
+<script id="store-fullscreen-js-v2">
+(function(){
+  if (window.__storeFSv2) return; window.__storeFSv2 = true;
+  const qs = s => document.querySelector(s);
+  function ensureIcon(){
+    const grid = qs('#iconGrid'); if(!grid) return;
+    if (grid.querySelector('.appIcon[data-app="store"]')) return;
+    const after = grid.querySelector('.appIcon[data-app="camera"]') || grid.lastElementChild;
+    const card = document.createElement('div');
+    card.className = 'appIcon';
+    card.setAttribute('data-app','store');
+    card.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true">      <path d="M4 10l1-4a2 2 0 012-2h10a2 2 0 012 2l1 4" opacity=".7"/>      <path d="M3 10h18l-1 9a2 2 0 01-2 2H6a2 2 0 01-2-2L3 10z"/>      <path d="M9 14h6M9 18h6" opacity=".7"/></svg>      <div class="label">Loja</div>';
+    card.addEventListener('click', () => openStore());
+    if (after && after.parentNode===grid) after.after(card); else grid.appendChild(card);
+  }
+  function openStore(){
+    const ov = qs('#storeOverlay'), ifr = qs('#storeFrame');
+    if(!ov || !ifr){ console.warn('store overlay missing'); return; }
+    ifr.src = 'store.html?v=' + Date.now();     // forçar não usar cache
+    ov.style.display = 'block';
+    try { history.pushState({store:true}, '', location.href); } catch(e){}
+  }
+  function closeStore(){
+    const ov = qs('#storeOverlay'), ifr = qs('#storeFrame');
+    if (ov) ov.style.display = 'none';
+    if (ifr) try{ ifr.src = 'about:blank'; } catch(e){}
+  }
+  // deixar global pro sistema chamar ao tocar no botão Home/Voltar
+  window.closeStore = closeStore;
+  // Hook em openApp('store')
+  const orig = window.openApp;
+  if (typeof orig === 'function'){
+    if (!orig.__storeHooked){
+      window.openApp = function(name){
+        if (name === 'store'){ openStore(); return; }
+        return orig.apply(this, arguments);
+      };
+      window.openApp.__storeHooked = true;
+    }
+  } else {
+    window.openApp = function(name){ if(name==='store') openStore(); };
+  }
+  // ESC fecha, Back do histórico fecha
+  document.addEventListener('keydown', (e)=>{ if(e.key==='Escape') closeStore(); });
+  window.addEventListener('popstate', ()=>{ closeStore(); });
+  // Mensagens do OS / Navbar para fechar
+  window.addEventListener('message', (ev)=>{
+    const t = ev.data && ev.data.type;
+    if (t==='NAV_HOME' || t==='CLOSE_APP' || t==='NAV_BACK') closeStore();
+  });
+  // Inicializa
+  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', ensureIcon, {once:true});
+  else ensureIcon();
+})();
+</script>
+
+
+<script id="store-nav-listener">
+// Fecha a Loja quando a navbar enviar comandos globais
+(function(){
+  if (window.__storeNavHook) return; window.__storeNavHook = true;
+  function closeStoreOverlay(){
+    var ov = document.getElementById('storeOverlay');
+    var ifr = document.getElementById('storeFrame');
+    if (ov && ov.style.display === 'block'){
+      ov.style.display = 'none';
+      if (ifr){ try { ifr.src = 'about:blank'; } catch(e){} }
+    }
+  }
+  // 1) Ouve mensagens globais vindas da navbar/sistema
+  window.addEventListener('message', function(ev){
+    var t = ev.data && ev.data.type;
+    if (t === 'NAV_HOME' || t === 'NAV_BACK' || t === 'NAV_WINDOW' || t === 'CLOSE_APP'){
+      closeStoreOverlay();
+    }
+  });
+  // 2) Se tua navbar chama funções globais, hooka também se existirem
+  ['goHome','goBack','toggleWindow'].forEach(function(fn){
+    if (typeof window[fn] === 'function'){
+      var orig = window[fn];
+      window[fn] = function(){
+        try { closeStoreOverlay(); } catch(e){}
+        return orig.apply(this, arguments);
+      };
+    }
+  });
+  // 3) expõe para chamadas diretas
+  window.closeStore = function(){ closeStoreOverlay(); };
+})();
+</script>
+
+
+<style id="store-nav-pointer-patch">
+  /* Permite clicar na NAVBAR enquanto a loja está aberta */
+  #storeOverlay{ pointer-events: none; }
+  #storeOverlay .inner, #storeOverlay iframe{ pointer-events: auto; }
+</style>
+
+
+<script id="store-bottom-autosize">
+(function(){
+  if (window.__storeAutoSize) return; window.__storeAutoSize = true;
+  function navElem(){
+    return document.querySelector('#navbar, .navbar, .bottomBar, .navBar, [role="navigation"], [data-role="navbar"]');
+  }
+  function readVarSysH(){
+    var v = getComputedStyle(document.documentElement).getPropertyValue('--sys-h') || '';
+    var n = parseFloat(v); return isFinite(n) ? n : 64;
+  }
+  function measureNavHeight(){
+    var el = navElem();
+    if (el){
+      var r = el.getBoundingClientRect();
+      return Math.max(44, Math.round(r.height));
+    }
+    return readVarSysH();
+  }
+  function ensureZIndex(overlay){
+    var el = navElem();
+    var navZ = 0;
+    if (el){
+      var z = getComputedStyle(el).zIndex;
+      navZ = parseInt(z,10); if (!isFinite(navZ)) navZ = 9999;
+    } else {
+      navZ = 9999;
+    }
+    // overlay abaixo da navbar, acima do desktop
+    overlay.style.zIndex = String(navZ - 1);
+  }
+  function applyBottom(){
+    var ov = document.getElementById('storeOverlay');
+    if (!ov) return;
+    var h = measureNavHeight();
+    ov.style.bottom = h + 'px';
+    ensureZIndex(ov);
+  }
+  // quando abrir a loja, recalcula bottom
+  var openStoreOrig = window.openApp;
+  window.openApp = function(name){
+    if (name === 'store'){
+      setTimeout(applyBottom, 0);
+    }
+    if (typeof openStoreOrig === 'function') return openStoreOrig.apply(this, arguments);
+  };
+  // também observa resizes/orientation
+  window.addEventListener('resize', applyBottom);
+  window.addEventListener('orientationchange', applyBottom);
+  // tenta ajustar no load também
+  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', applyBottom, {once:true});
+  else applyBottom();
+})();
+</script>
+
+
+<script id="store-pointerdown-one-tap">
+(function(){
+  if (window.__storeOneTap) return; window.__storeOneTap = true;
+  function isStoreOpen(){
+    var ov = document.getElementById('storeOverlay');
+    return !!(ov && ov.style.display === 'block');
+  }
+  function navHeight(){
+    var el = document.querySelector('#navbar, .navbar, .bottomBar, .navBar, [role="navigation"], [data-role="navbar"]');
+    if (el){
+      var r = el.getBoundingClientRect();
+      return Math.max(44, Math.round(r.height));
+    }
+    var v = getComputedStyle(document.documentElement).getPropertyValue('--sys-h') || '64';
+    var n = parseFloat(v); return isFinite(n) ? n : 64;
+  }
+  function closeStore(){
+    var ov = document.getElementById('storeOverlay');
+    var ifr = document.getElementById('storeFrame');
+    if (ov){ ov.style.display = 'none'; }
+    if (ifr){ try{ ifr.src = 'about:blank'; }catch(e){} }
+  }
+  // 1-tap: qualquer toque no retângulo da navbar fecha a Loja imediatamente
+  function onPointer(e){
+    if (!isStoreOpen()) return;
+    var h = navHeight();
+    var threshold = (window.innerHeight || document.documentElement.clientHeight) - h - 1;
+    if ((e.clientY || 0) >= threshold){
+      // não bloqueia o evento -> navbar ainda recebe o clique
+      closeStore();
+    }
+  }
+  window.addEventListener('pointerdown', onPointer, {passive:true});
+  // fallback p/ navegadores antigos
+  window.addEventListener('touchstart', onPointer, {passive:true});
+  window.addEventListener('mousedown', onPointer, {passive:true});
+})();
+</script>
+
 </body>
 </html>
