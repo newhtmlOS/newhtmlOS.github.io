@@ -1,0 +1,739 @@
+<!doctype html>
+<html lang="pt-BR" data-theme="dark">
+<head>
+  <link rel="manifest" href="manifest.webmanifest">
+<meta name="theme-color" content="#0b1220">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<script>
+if ('serviceWorker' in navigator) {
+  window.addEventListener('load', () => {
+    navigator.serviceWorker.register('./sw.js').catch(console.error);
+  });
+}
+</script>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover,maximum-scale=1"/>
+<title>x1coOS — v7 (Assistente com parser matemático avançado)</title>
+<meta name="theme-color" content="#0b1220" media="(prefers-color-scheme: dark)">
+<meta name="theme-color" content="#eef2f8" media="(prefers-color-scheme: light)">
+<style>
+:root{
+  --bg:#0b1220; --panel:#0f1724; --accent:#22d3ee; --accent2:#60a5fa;
+  --text:#e6eef8; --muted:#9fb1c9;
+  --glass: linear-gradient(180deg, rgba(255,255,255,0.02), rgba(255,255,255,0.01));
+  --stroke: rgba(255,255,255,0.10); --hover: rgba(255,255,255,0.06);
+  --shadow: 0 12px 30px rgba(0,0,0,.45);
+  --radius: 16px;
+  --safe-b: env(safe-area-inset-bottom, 0px);
+  --safe-t: env(safe-area-inset-top, 0px);
+  --sys-h: 64px;
+}
+:root[data-theme="light"]{
+  --bg:#eef2f8; --panel:#ffffff; --accent:#0ea5e9; --accent2:#6366f1;
+  --text:#0f172a; --muted:#475569; --stroke: rgba(0,0,0,0.10); --hover: rgba(0,0,0,0.05);
+  --shadow: 0 12px 30px rgba(0,0,0,.12);
+}
+
+*{box-sizing:border-box}
+html,body{height:100%;margin:0;padding:0;overflow:hidden;background:linear-gradient(180deg,#071026 0%, #09172a 50%, #071222 100%)}
+:root[data-theme="light"] body{background:linear-gradient(180deg,#f4f7fb 0%, #eef2f8 50%, #e8edf6 100%)}
+body{color:var(--text);font:14px/1.35 Inter, ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, Arial}
+@media (prefers-reduced-motion:no-preference){
+  *{transition:background-color .25s,color .25s,border-color .25s,opacity .2s,transform .12s}
+}
+
+#root{position:relative;width:100vw;height:100dvh;min-height:100svh;display:flex;flex-direction:column;overflow:hidden}
+.desktop{flex:1;display:flex;flex-direction:column;overflow:hidden}
+.wallpaper{flex:1;padding:18px 18px 0;display:flex;flex-direction:column;gap:14px;overflow:auto;
+  background:
+    radial-gradient(1200px 600px at -10% -20%, color-mix(in oklab, var(--accent) 22%, transparent) 0%, transparent 60%),
+    radial-gradient(900px 600px at 120% 120%, color-mix(in oklab, var(--accent2) 18%, transparent) 0%, transparent 60%);
+}
+.homeActions{display:flex;gap:10px;align-self:flex-end}
+.fsBtn{display:inline-flex;align-items:center;gap:8px;padding:10px 12px;border-radius:12px;
+  background:var(--panel);border:1px solid var(--stroke);cursor:pointer;color:var(--text);box-shadow:var(--shadow);user-select:none}
+.fsBtn:hover{background:var(--hover)}
+.fsBtn svg{width:18px;height:18px}
+
+.grid{display:grid; gap:16px; grid-template-columns: repeat(auto-fill, minmax(98px, 1fr));}
+.appIcon{background:var(--glass); border:1px solid var(--stroke); border-radius:18px; padding:12px;
+  box-shadow: var(--shadow); cursor:pointer; user-select:none; display:flex; flex-direction:column; align-items:center; gap:10px;}
+.appIcon:hover{background:var(--hover); transform:translateY(-1px)}
+.appIcon svg{width:38px;height:38px}
+.appIcon .label{font-size:12px;color:var(--muted);text-align:center}
+
+.taskbar{display:flex; align-items:center; gap:10px;height:54px; padding:8px 10px;
+  background:linear-gradient(0deg, rgba(0,0,0,0.35), rgba(255,255,255,0.02)); backdrop-filter: blur(8px); border-top:1px solid var(--stroke)}
+.start{width:38px;height:38px;border-radius:12px;background:var(--panel);border:1px solid var(--stroke);display:flex;align-items:center;justify-content:center;cursor:pointer}
+.tasks{display:flex;gap:6px;align-items:center;flex:1;overflow:auto}
+.taskBtn{border:1px solid var(--stroke);background:var(--panel);color:var(--text);padding:8px 12px;border-radius:12px;white-space:nowrap}
+.clock{min-width:84px;text-align:right;color:var(--muted);font-variant-numeric:tabular-nums}
+
+.startMenu{position:absolute;left:12px;right:12px;bottom:64px;background:var(--panel);border:1px solid var(--stroke);border-radius:18px;box-shadow:var(--shadow);padding:12px;display:none;z-index:30}
+.startMenu.visible{display:block}
+.startMenu .row{display:flex;gap:8px;flex-wrap:wrap}
+.startMenu button{border:1px solid var(--stroke);background:var(--glass);color:var(--text);padding:10px 12px;border-radius:12px;cursor:pointer}
+
+.window{position:absolute; left:64px; top:64px; width:780px; height:520px;background:var(--glass); border:1px solid var(--stroke); border-radius:16px; box-shadow: var(--shadow); display:flex; flex-direction:column; overflow:hidden}
+.titlebar{height:44px; display:flex; align-items:center; gap:8px; padding:0 10px; background:linear-gradient(180deg, rgba(255,255,255,0.03), transparent)}
+.title{flex:1; font-weight:700}
+.controls{display:flex; gap:6px}
+.ctrl{width:28px;height:28px;border-radius:10px;display:inline-flex;align-items:center;justify-content:center;cursor:pointer}
+.ctrl:hover{background:var(--hover)}
+.content{flex:1; overflow:auto; padding:12px; background:linear-gradient(180deg, rgba(255,255,255,0.006), transparent)}
+
+@media (max-width: 900px){
+  .taskbar.hideOnMobile{display:none !important}
+  .window.mobile-full{position:fixed; inset:0; width:100vw; height:100dvh; border-radius:0; left:0 !important; top:0 !important; border:none}
+  .window.mobile-full .titlebar{display:none}
+  .window.mobile-full .content{padding:10px; padding-bottom:calc(var(--sys-h) + var(--safe-b) + 10px)}
+}
+
+.systemBar{position:fixed; left:0; right:0; bottom:0; height:calc(var(--sys-h) + var(--safe-b));
+  padding:8px 16px calc(8px + var(--safe-b)); background:linear-gradient(180deg, rgba(0,0,0,0.25), rgba(0,0,0,0.45)); backdrop-filter: blur(10px);
+  border-top:1px solid var(--stroke); display:none; align-items:center; justify-content:center; gap:28px; z-index:40}
+.systemBar.visible{display:flex}
+.sysBtn{width:46px;height:46px;border-radius:999px;border:1px solid var(--stroke); background:var(--panel);color:var(--text);display:flex;align-items:center;justify-content:center;cursor:pointer;box-shadow:var(--shadow)}
+.sysHome{width:86px;border-radius:999px}
+.sysIcon{width:22px;height:22px}
+
+.camView{width:100%; aspect-ratio:16/9; background:#000; border-radius:14px}
+.toolbar{display:flex; gap:8px; flex-wrap:wrap; align-items:center; margin-top:10px}
+.button{border:1px solid var(--stroke); background:var(--panel); color:var(--text); padding:9px 12px; border-radius:12px; cursor:pointer; font-weight:700}
+.button:hover{background:var(--hover)}
+.preview{max-width:100%; display:none; border-radius:14px; margin-top:10px}
+.hint{color:var(--muted); font-size:12px}
+.switch{display:inline-flex; align-items:center; gap:10px}
+.switch input{appearance:none;width:50px;height:28px;border-radius:28px;background:#9aa2b1;position:relative;outline:none;transition:background .2s}
+.switch input:checked{background:var(--accent)}
+.switch input::after{content:""; position:absolute; top:3px; left:3px; width:22px; height:22px; border-radius:50%; background:#fff; transition:left .2s}
+.switch input:checked::after{ left:25px }
+.toast{position:fixed; left:50%; transform:translateX(-50%); bottom:calc(var(--sys-h) + var(--safe-b) + 20px); background:var(--panel); border:1px solid var(--stroke); padding:10px 12px; border-radius:12px; box-shadow:var(--shadow); z-index:50; font-size:13px}
+
+.chat{display:flex; flex-direction:column; gap:10px; height:100%}
+.chatLog{flex:1; overflow:auto; background:rgba(0,0,0,0.25); border:1px solid var(--stroke); border-radius:12px; padding:10px}
+.msg{display:flex; gap:8px; margin:6px 0}
+.msg.me{justify-content:flex-end}
+.bubble{max-width:80%; padding:10px 12px; border-radius:14px}
+.me .bubble{background:var(--accent2); color:white; border-top-right-radius:6px}
+.ai .bubble{background:var(--panel); border:1px solid var(--stroke); border-top-left-radius:6px}
+.chatInput{display:flex; gap:8px}
+.chatInput input{flex:1; padding:10px; border-radius:12px; border:1px solid var(--stroke); background:transparent; color:inherit}
+</style>
+</head>
+<body>
+<div id="root">
+  <div class="desktop" id="desktop">
+    <div class="wallpaper">
+      <div class="homeActions">
+        <button id="homeFullscreen" class="fsBtn" title="Tela cheia do sistema" aria-label="Tela cheia">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M8 3H3v5M16 3h5v5M21 16v5h-5M3 16v5h5"/></svg>
+          <span id="fsLabel">Tela cheia</span>
+        </button>
+      </div>
+      <div class="grid" id="iconGrid">
+        <div class="appIcon" data-app="assistant"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="12" cy="12" r="9" opacity=".2"/><path d="M8 12h8M12 8v8"/></svg><div class="label">Assistente</div></div>
+        <div class="appIcon" data-app="terminal" style="visibility:hidden;pointer-events:none"<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M3 5h18v14H3z" opacity=".2"/><path d="M7 9l3 3-3 3M12 15h5"/></svg><div class="label">Terminal</div></div>
+        <div class="appIcon" data-app="notes"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M6 3h9l3 3v15H6z" opacity=".2"/><path d="M15 3v4h4M8 10h8M8 14h8M8 18h6"/></svg><div class="label">Notas</div></div>
+        <div class="appIcon" data-app="settings"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M12 8a4 4 0 100 8 4 4 0 000-8z"/><path d="M4 12h2M18 12h2M12 4v2M12 18v2M5.6 5.6l1.4 1.4M16.9 16.9l1.4 1.4M5.6 18.4l1.4-1.4M16.9 7.1l1.4-1.4" opacity=".6"/></svg><div class="label">Config</div></div>
+        <div class="appIcon" data-app="camera"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="3" y="6" width="18" height="12" rx="3" opacity=".2"/><path d="M9 6l2-2h2l2 2"/><circle cx="12" cy="12" r="4"/></svg><div class="label">Câmera</div></div>
+      </div>
+    </div>
+    <div class="taskbar" id="taskbar">
+      <div class="start" id="btnStart" title="Iniciar">☰</div>
+      <div class="tasks" id="tasks"></div>
+      <div class="clock" id="clock">--:--</div>
+    </div>
+    <div class="startMenu" id="startMenu">
+      <div class="row">
+        <button data-app="assistant">Assistente</button>
+        <button data-app="notes">Notas</button>
+        <button data-app="camera">Câmera</button>
+        <button data-app="settings">Config</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="systemBar" id="systemBar" aria-label="Barra do sistema">
+    <button class="sysBtn" id="btnBack" title="Voltar" aria-label="Voltar">
+      <svg class="sysIcon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M15 18l-6-6 6-6"/></svg>
+    </button>
+    <button class="sysBtn sysHome" id="btnHome" title="Home" aria-label="Home">
+      <svg class="sysIcon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 12l9-9 9 9"/><path d="M9 21V9h6v12"/></svg>
+    </button>
+    <button class="sysBtn" id="btnRecents" title="Tarefas" aria-label="Tarefas">
+      <svg class="sysIcon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <rect x="4" y="4" width="7" height="7"/><rect x="13" y="4" width="7" height="7"/>
+        <rect x="4" y="13" width="7" height="7"/><rect x="13" y="13" width="7" height="7"/>
+      </svg>
+    </button>
+  </div>
+</div>
+
+<template id="winTpl">
+  <div class="window" data-id="">
+    <div class="titlebar">
+      <div class="title">Janela</div>
+      <div class="controls">
+        <div class="ctrl" data-act="min">—</div>
+        <div class="ctrl" data-act="max">□</div>
+        <div class="ctrl" data-act="close">✕</div>
+      </div>
+    </div>
+    <div class="content"></div>
+  </div>
+</template>
+
+<script>
+document.addEventListener('DOMContentLoaded', () => {
+  const winTpl = document.getElementById('winTpl');
+  const tasks = document.getElementById('tasks');
+  const startMenu = document.getElementById('startMenu');
+  const btnStart = document.getElementById('btnStart');
+  const iconGrid = document.getElementById('iconGrid');
+  const clock = document.getElementById('clock');
+  const systemBar = document.getElementById('systemBar');
+  const taskbar = document.getElementById('taskbar');
+  const bBack = document.getElementById('btnBack');
+  const bHome = document.getElementById('btnHome');
+  const bRecents = document.getElementById('btnRecents');
+  const homeFS = document.getElementById('homeFullscreen');
+  const fsLabel = document.getElementById('fsLabel');
+  let z = 10, idc = 1;
+  const THEME_KEY = 'htmlos-theme';
+  const isMobile = () => window.matchMedia('(max-width: 900px)').matches;
+
+  (function applyTheme(){
+    const saved = localStorage.getItem(THEME_KEY);
+    const theme = (saved==='light'||saved==='dark')?saved:'dark';
+    document.documentElement.setAttribute('data-theme', theme);
+  })();
+
+  function now(){ const d = new Date(); return d.toLocaleTimeString([], {hour:'2-digit',minute:'2-digit'}); }
+  clock.textContent = now(); setInterval(()=> clock.textContent = now(), 1000);
+
+  function fsActive(){ return !!(document.fullscreenElement || document.webkitFullscreenElement); }
+  async function enterFullscreen(){
+    const el = document.documentElement;
+    try{
+      if(el.requestFullscreen) await el.requestFullscreen();
+      else if(el.webkitRequestFullscreen) await el.webkitRequestFullscreen();
+      fsLabel.textContent = 'Sair de tela cheia';
+    }catch(e){
+      alert('Seu navegador pode bloquear tela cheia aqui. Em iOS, instale como app (PWA) para melhor efeito.');
+    }
+  }
+  async function exitFullscreen(){
+    try{
+      if(document.fullscreenElement && document.exitFullscreen) await document.exitFullscreen();
+      else if(document.webkitFullscreenElement && document.webkitExitFullscreen) await document.webkitExitFullscreen();
+      fsLabel.textContent = 'Tela cheia';
+    }catch(e){}
+  }
+  function syncFsLabel(){ fsLabel.textContent = fsActive() ? 'Sair de tela cheia' : 'Tela cheia'; }
+  document.addEventListener('fullscreenchange', syncFsLabel);
+  document.addEventListener('webkitfullscreenchange', syncFsLabel);
+  homeFS.addEventListener('click', ()=>{ fsActive() ? exitFullscreen() : enterFullscreen(); });
+
+  function addTask(id, title){
+    const b = document.createElement('button'); b.className='taskBtn'; b.textContent=title; b.dataset.win=id;
+    tasks.appendChild(b); b.addEventListener('click', ()=> focusWin(id));
+  }
+  function rmTask(id){ const b = tasks.querySelector(`[data-win="${id}"]`); if(b) b.remove(); }
+  function focusWin(id){ const w = document.querySelector(`.window[data-id="${id}"]`); if(!w) return; w.style.zIndex = ++z; w.style.display='flex'; }
+
+  function makeDrag(win){
+    const bar = win.querySelector('.titlebar');
+    let dx=0,dy=0,sx=0,sy=0,drag=false;
+    function start(e){
+      if(isMobile()) return;
+      drag=true; const p=e.touches?e.touches[0]:e; dx=p.clientX; dy=p.clientY;
+      sx=parseInt(win.style.left||0); sy=parseInt(win.style.top||0); win.style.zIndex=++z;
+    }
+    function move(e){
+      if(!drag) return; const p=e.touches?e.touches[0]:e;
+      win.style.left = Math.max(8, Math.min(window.innerWidth-120, sx + (p.clientX-dx)))+'px';
+      win.style.top  = Math.max(8, Math.min(window.innerHeight-100, sy + (p.clientY-dy)))+'px';
+    }
+    function end(){ drag=false; }
+    bar.addEventListener('mousedown', start); document.addEventListener('mousemove', move); document.addEventListener('mouseup', end);
+    bar.addEventListener('touchstart', start, {passive:false}); document.addEventListener('touchmove', move, {passive:false}); document.addEventListener('touchend', end);
+  }
+
+  function openApp(name){
+    const win = winTpl.content.cloneNode(true).querySelector('.window');
+    const id = 'w'+(idc++); win.dataset.id=id;
+    const content = win.querySelector('.content');
+    const title = win.querySelector('.title');
+
+    win.style.left = (60+Math.random()*180)+'px';
+    win.style.top = (60+Math.random()*120)+'px';
+
+    document.getElementById('desktop').appendChild(win);
+    addTask(id, name[0].toUpperCase()+name.slice(1));
+    makeDrag(win);
+    focusWin(id);
+
+    if(isMobile()){
+      win.classList.add('mobile-full');
+      systemBar.classList.add('visible');
+      taskbar.classList.add('hideOnMobile');
+      win.style.left = '0px';
+      win.style.top = '0px';
+      win.style.width = '100vw';
+      win.style.height = '100dvh';
+    }
+
+    win.querySelector('[data-act="close"]').addEventListener('click', ()=>{
+      win.remove(); rmTask(id);
+      if(isMobile() && document.querySelectorAll('.window').length===0){
+        systemBar.classList.remove('visible');
+        taskbar.classList.remove('hideOnMobile');
+      }
+    });
+    win.querySelector('[data-act="min"]').addEventListener('click', ()=>{ win.style.display='none'; });
+    win.querySelector('[data-act="max"]').addEventListener('click', ()=>{ if(!isMobile()) toggleMaxDesktop(win); });
+
+    if(name==='assistant'){
+      title.textContent='Assistente';
+      buildAssistant(content);
+    }
+    if(name==='terminal'){
+      title.textContent='Terminal';
+      content.innerHTML = `
+        <div class="hint" style="margin-bottom:6px"><strong>x1coOS Terminal</strong> — digite <code>help</code></div>
+        <pre id="out" style="background:#071320;border-radius:12px;padding:10px;min-height:220px;white-space:pre-wrap;color:#bfe9d7"></pre>
+        <div style="display:flex;gap:8px">
+          <input id="cmd" placeholder="Digite um comando..." autocomplete="off" autocorrect="off" autocapitalize="none"
+            style="flex:1;padding:10px;border-radius:12px;border:1px solid var(--stroke);background:transparent;color:inherit">
+          <button id="run" class="button">Executar</button>
+        </div>`;
+      wireTerminal(content);
+    }
+    if(name==='notes'){
+      title.textContent='Notas';
+      content.innerHTML = `<textarea style="width:100%;height:60vh;background:#071320;color:#bfe9d7;border:none;padding:12px;border-radius:12px;resize:none"></textarea>`;
+    }
+    if(name==='settings'){
+      title.textContent='Config';
+      const isLight = document.documentElement.getAttribute('data-theme')==='light';
+      content.innerHTML = `
+        <div class="switch"><input id="themeToggle" type="checkbox" ${isLight?'checked':''}><span>Modo Claro</span></div>
+        <p class="hint" style="margin-top:8px">Preferência salva no navegador.</p>`;
+      setTimeout(()=>{
+        const tg = content.querySelector('#themeToggle');
+        tg.addEventListener('change', e=>{
+          const theme = e.target.checked ? 'light' : 'dark';
+          document.documentElement.setAttribute('data-theme', theme);
+          localStorage.setItem(THEME_KEY, theme);
+        });
+      },0);
+    }
+    if(name==='camera'){
+      title.textContent='Câmera';
+      buildCamera(content, win);
+    }
+  }
+
+  function toggleMaxDesktop(win){
+    if(win.dataset.maxed==='1'){
+      win.style.width = win.dataset.w; win.style.height = win.dataset.h; win.style.left = win.dataset.l; win.style.top = win.dataset.t; win.dataset.maxed='0';
+    } else {
+      win.dataset.w = win.style.width; win.style.left='0px'; win.style.top='0px';
+      win.dataset.l = '0px'; win.dataset.t = '0px';
+      win.style.height = win.dataset.h;
+      win.style.width=window.innerWidth+'px'; win.style.height=(window.innerHeight-54)+'px'; win.dataset.maxed='1';
+    }
+  }
+
+  /* ===== Terminal ===== */
+  const fs = {'/':{type:'dir',children:{
+    home:{type:'dir',children:{user:{type:'dir',children:{'readme.txt':{type:'file',content:'Bem-vindo ao x1coOS!'}}}}},
+    etc:{type:'dir',children:{'motd.txt':{type:'file',content:'Message of the Day'}}}
+  }}};
+  let cwd = '/home/user';
+  function norm(p){
+    if(!p) return '/';
+    if(p.startsWith('/')){ const parts=p.split('/').filter(Boolean); const out=[]; for(const part of parts){ if(part==='..') out.pop(); else if(part!=='.') out.push(part);} return '/'+out.join('/'); }
+    const base=cwd==='/'?[]:cwd.split('/').filter(Boolean);
+    const parts=p.split('/').filter(Boolean); const out=base.slice();
+    for(const part of parts){ if(part==='..') out.pop(); else if(part!=='.') out.push(part); }
+    return '/'+out.join('/');
+  }
+  function node(p){
+    const n=norm(p); if(n==='/') return fs['/'];
+    const parts=n.split('/').filter(Boolean); let cur=fs['/'];
+    for(const part of parts){ if(!cur.children||!cur.children[part]) return null; cur=cur.children[part]; }
+    return cur;
+  }
+  function lsd(p){
+    const n=node(p); if(!n) return {error:'Diretório não encontrado'};
+    if(n.type!=='dir') return {error:'Não é um diretório'};
+    return {children:Object.keys(n.children).map(k=>({name:k,node:n.children[k]}))};
+  }
+  function wireTerminal(scope){
+    const out = scope.querySelector('#out');
+    const cmd = scope.querySelector('#cmd');
+    const run = scope.querySelector('#run');
+    function write(t){ out.textContent += t + '\n'; out.scrollTop = out.scrollHeight; }
+    function exec(line){
+      const s=(line||'').trim(); if(!s) return; write('> '+s);
+      const parts=s.split(' ').filter(Boolean); const c=parts[0]; const rest=parts.slice(1).join(' ');
+      if(c==='help') write('help, time, pwd, ls, cd <dir>, echo <txt>, clear, cat <file>');
+      else if(c==='time') write(new Date().toString());
+      else if(c==='pwd') write(cwd);
+      else if(c==='ls'){ const p=norm(rest||'.'); const r=lsd(p); if(r.error) write('Erro: '+r.error); else write(r.children.map(it=>it.node.type==='dir'?it.name+'/':it.name).join('  ')||'(vazio)'); }
+      else if(c==='cd'){ const p=norm(rest||'/home/user'); const n=node(p); if(!n) write('cd: não existe'); else if(n.type!=='dir') write('cd: não é dir'); else { cwd=p; write('ok'); } }
+      else if(c==='echo') write(rest);
+      else if(c==='clear') out.textContent='';
+      else if(c==='cat'){ const p=norm(rest); const n=node(p); if(!n) write('cat: não encontrado'); else if(n.type!=='file') write('cat: não é arquivo'); else write(n.content||''); }
+      else write('Comando não reconhecido.');
+    }
+    run.addEventListener('click', ()=>{ exec(cmd.value); cmd.value=''; cmd.focus(); });
+    cmd.addEventListener('keydown', e=>{ if(e.key==='Enter'){ e.preventDefault(); exec(cmd.value); cmd.value=''; } });
+    setTimeout(()=> cmd && cmd.focus(), 0);
+  }
+
+  /* ===== Assistente (parser avançado) ===== */
+  function buildAssistant(container){
+    container.innerHTML = `
+      <div class="chat">
+        <div class="chatLog" id="chatLog"></div>
+        <div class="chatInput">
+          <input id="ask" placeholder="Pergunte: 'quanto é 15% de 240', 'raiz quadrada de 81', '2x(3+4)'..." autocomplete="off"/>
+          <button id="send" class="button">Enviar</button>
+        </div>
+      </div>`;
+    const log = container.querySelector('#chatLog');
+    const ask = container.querySelector('#ask');
+    const send = container.querySelector('#send');
+
+    function addMsg(text, who='ai'){
+      const wrap = document.createElement('div');
+      wrap.className = 'msg ' + (who==='me'?'me':'ai');
+      const b = document.createElement('div');
+      b.className = 'bubble';
+      b.textContent = text;
+      wrap.appendChild(b);
+      log.appendChild(wrap);
+      log.scrollTop = log.scrollHeight;
+    }
+    function n2s(n){ try { return new Intl.NumberFormat('pt-BR', {maximumFractionDigits: 12}).format(n); } catch(e){ return String(n); } }
+
+    function normalize(s){
+      return (s||'').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'');
+    }
+
+    // Quick intents
+    function smallTalk(text){
+      const norm = normalize(text);
+      const h = new Date();
+      if(/^(oi|ola|ol[aá]|e ai|eae|salve|fala|bom dia|boa tarde|boa noite)\b/.test(norm)){
+        const hr = h.getHours();
+        const sauda = hr<12? 'Bom dia' : (hr<18? 'Boa tarde' : 'Boa noite');
+        return `${sauda}! Eu sou o Assistente do x1coOS. Posso fazer contas, porcentagens, raízes, potências e mais.`;
+      }
+      if(/que horas|qual (?:o|e) horario|que horas sao|horas?\b/.test(norm)){
+        return `Agora são ${h.toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'})}.`;
+      }
+      if(/piada|conte.*piada|me faz rir/.test(norm)){
+        const jokes=[
+          'Qual é o lugar mais certo do livro? O índice, porque está sempre no ponto. 😅',
+          'Por que a matemática é humilde? Porque sabe que não é exata para todo mundo.',
+          'Passei por 2, 3 e 5 e ninguém me cumprimentou… acho que não sou par!'
+        ];
+        return jokes[Math.floor(Math.random()*jokes.length)];
+      }
+      if(/tabuada de\s*(\d+)/.test(norm)){
+        const n = parseInt(norm.match(/tabuada de\s*(\d+)/)[1],10);
+        let lines=[]; for(let i=0;i<=10;i++){ lines.push(`${n} x ${i} = ${n*i}`); }
+        return lines.join('\n');
+      }
+      return null;
+    }
+
+    // Natural language to math expression
+    function toExpr(text){
+      let s = normalize(text).replace(/,/g,'.');
+      // remove leading phrases
+      s = s.replace(/\b(quanto e|quanto eh|quanto vale|calcule|resolve|resultado de|qual (?:o|e) resultado de)\b/g, '').trim();
+
+      // percentage "a% de b" -> (a/100)*b
+      s = s.replace(/(\d+(?:\.\d+)?)\s*%\s*(?:de\s*)?(\d+(?:\.\d+)?)/g, '($1/100)*($2)');
+      // standalone "a%" -> (a/100)
+      s = s.replace(/(\d+(?:\.\d+)?)\s*%/g, '($1/100)');
+
+      // words to operators
+      s = s.replace(/\b(mais|somado a|adicao de)\b/g, '+');
+      s = s.replace(/\b(menos|subtra[ií]do de?)\b/g, '-');
+      s = s.replace(/\b(vezes|multiplicado por|x)\b/g, '*');
+      s = s.replace(/\b(dividido por|sobre)\b/g, '/');
+      s = s.replace(/\b(modulo|resto de)\b/g, '%');
+
+      // potencia
+      s = s.replace(/\b(elevado a|potencia de|ao quadrado)\b/g, '^2').replace(/\b(ao cubo)\b/g, '^3');
+      s = s.replace(/\braiz quadrada de\b/g, 'sqrt(').replace(/\braiz cubica de\b/g, 'cbrt(');
+      // close function parens if user didn't
+      s = s.replace(/sqrt\(([^)]+)$/g, 'sqrt($1)');
+      s = s.replace(/cbrt\(([^)]+)$/g, 'cbrt($1)');
+
+      // implicit multiplication: number)(, )(number, numberfn, )fn
+      s = s.replace(/(\d)\s*\(/g, '$1*(');
+      s = s.replace(/\)\s*(\d)/g, ')*$1');
+      s = s.replace(/(\d)\s*(sqrt|cbrt)\s*\(/g, '$1*$2(');
+
+      // replace constants
+      s = s.replace(/\bpi\b/g, String(Math.PI)).replace(/\be\b/g, String(Math.E));
+
+      // Keep only allowed chars
+      if(!/^[\d+\-*/^()%.\sA-Za-z]*$/.test(s)) throw new Error('Expressão inválida.');
+      return s;
+    }
+
+    // Shunting-yard with ^ (right-assoc), %, functions sqrt/cbrt, unary minus
+    function evalExpr(expr){
+      if(!expr) throw new Error('Expressão vazia');
+      const tokens=[];
+      let i=0;
+      while(i<expr.length){
+        const ch=expr[i];
+        if(ch===' '){ i++; continue; }
+        if('+-*/^()%'.includes(ch)){ tokens.push(ch); i++; continue; }
+        if(/[0-9.]/.test(ch)){
+          let j=i+1; while(j<expr.length && /[0-9.]/.test(expr[j])) j++;
+          tokens.push(expr.slice(i,j)); i=j; continue;
+        }
+        // function names
+        if(/[A-Za-z]/.test(ch)){
+          let j=i+1; while(j<expr.length && /[A-Za-z]/.test(expr[j])) j++;
+          tokens.push(expr.slice(i,j)); i=j; continue;
+        }
+        throw new Error('Caractere inválido: '+ch);
+      }
+
+      // Handle unary minus
+      for(let k=0;k<tokens.length;k++){
+        if(tokens[k]==='-' && (k===0 || '(-+*/^%'.includes(tokens[k-1]))){
+          tokens[k] = 'u-';
+        }
+      }
+
+      const prec={ 'u-':4, '^':3, '*':2, '/':2, '%':2, '+':1, '-':1 };
+      const rightAssoc = {'^':true, 'u-':true};
+      const funcs = new Set(['sqrt','cbrt','abs']);
+
+      const out=[], op=[];
+      for(let t of tokens){
+        if(!isNaN(t)){ out.push(parseFloat(t)); continue; }
+        if(funcs.has(t)){ op.push(t); continue; }
+        if(t==='u-' || t in prec){
+          while(op.length){
+            const top=op[op.length-1];
+            if((top in prec || funcs.has(top)) &&
+              ((rightAssoc[t] && prec[top] > prec[t]) || (!rightAssoc[t] && prec[top] >= prec[t]))){
+              out.push(op.pop());
+            } else break;
+          }
+          op.push(t); continue;
+        }
+        if(t==='('){ op.push(t); continue; }
+        if(t===')'){
+          while(op.length && op[op.length-1] !== '(') out.push(op.pop());
+          if(op.pop()!=='(') throw new Error('Parênteses desbalanceados');
+          // if function on top, pop it too
+          if(op.length && funcs.has(op[op.length-1])) out.push(op.pop());
+          continue;
+        }
+        throw new Error('Token inválido: '+t);
+      }
+      while(op.length){
+        const o=op.pop();
+        if(o==='('||o===')') throw new Error('Parênteses desbalanceados');
+        out.push(o);
+      }
+      const st=[];
+      for(const t of out){
+        if(typeof t==='number'){ st.push(t); continue; }
+        if(t==='u-'){ const a=st.pop(); st.push(-a); continue; }
+        if(t==='sqrt'){ const a=st.pop(); st.push(Math.sqrt(a)); continue; }
+        if(t==='cbrt'){ const a=st.pop(); st.push(Math.cbrt(a)); continue; }
+        if(t==='abs'){ const a=st.pop(); st.push(Math.abs(a)); continue; }
+        const b=st.pop(), a=st.pop(); if(a===undefined||b===undefined) throw new Error('Expressão inválida');
+        switch(t){
+          case '+': st.push(a+b); break;
+          case '-': st.push(a-b); break;
+          case '*': st.push(a*b); break;
+          case '/': if(b===0) throw new Error('Divisão por zero'); st.push(a/b); break;
+          case '%': if(b===0) throw new Error('Módulo por zero'); st.push(a % b); break;
+          case '^': st.push(Math.pow(a,b)); break;
+          default: throw new Error('Op inválido: '+t);
+        }
+      }
+      if(st.length!==1) throw new Error('Expressão inválida');
+      return st[0];
+    }
+
+    function handleMath(text){
+      const expr = toExpr(text);
+      const val = evalExpr(expr);
+      return `Resultado: ${n2s(val)}`;
+    }
+
+    function reply(q){
+      const quick = smallTalk(q);
+      if(quick) return quick;
+      try{
+        return handleMath(q);
+      }catch(e){
+        return 'Não entendi. Tenta algo como: "15% de 240", "raiz quadrada de 81", "2x(3+4)", "3^4", "10 mod 3", "tabuada de 7".';
+      }
+    }
+
+    function sendMsg(){
+      const val = ask.value;
+      if(!val.trim()) return;
+      addMsg(val, 'me');
+      const r = reply(val);
+      addMsg(r, 'ai');
+      ask.value='';
+      ask.focus();
+    }
+
+    send.addEventListener('click', sendMsg);
+    ask.addEventListener('keydown', e=>{ if(e.key==='Enter'){ e.preventDefault(); sendMsg(); } });
+
+    addMsg('Oi! Posso resolver contas com + - × ÷, porcentagens, potências (^), raízes (sqrt), módulo (%), frações e até "tabuada de N". Escreve: "quanto é 15% de 240".');
+  }
+
+  /* ===== Câmera ===== */
+  let camStream=null, useFront=true, devId=null;
+  async function listCameras(sel){
+    try{
+      const devs = await navigator.mediaDevices.enumerateDevices();
+      const cams = devs.filter(d=>d.kind==='videoinput');
+      sel.innerHTML = cams.map((d,i)=>`<option value="${d.deviceId}">${d.label||'Câmera '+(i+1)}</option>`).join('');
+      if(cams.length && !devId) devId = cams[0].deviceId;
+    }catch(e){ console.warn('enumerateDevices', e); }
+  }
+  function constraints(){ const v = devId ? {deviceId:{exact:devId}} : {facingMode: useFront?'user':'environment'}; return {audio:false, video:v}; }
+  async function camStart(video){
+    camStop(video);
+    try {
+      if(!isSecureContext) throw new Error('insecure');
+      const s = await navigator.mediaDevices.getUserMedia(constraints());
+      camStream = s; video.srcObject = s; await video.play();
+    }catch(err){
+      let msg='Não consegui acessar a câmera.';
+      const n = (err && (err.name||err.message)) || '';
+      if(n.includes('NotAllowed')) msg+='\n• Permissão negada para este site.';
+      else if(n.includes('NotReadable')) msg+='\n• A câmera está em uso por outro app.';
+      else if(n.includes('NotFound')) msg+='\n• Nenhuma câmera encontrada.';
+      else if(n.includes('insecure')) msg+='\n• Precisa abrir via HTTPS ou localhost.';
+      else msg+='\n• Erro: '+n;
+      alert(msg);
+    }
+  }
+  function camStop(video){ if(camStream){ camStream.getTracks().forEach(t=>t.stop()); camStream=null; } if(video){ video.pause(); video.srcObject=null; } }
+  function buildCamera(container, win){
+    container.innerHTML = `
+      <div id="secureWarn"></div>
+      <video id="camView" class="camView" playsinline muted></video>
+      <div class="toolbar">
+        <button id="bStart" class="button">Iniciar</button>
+        <button id="bFlip"  class="button">Trocar</button>
+        <select id="bSel" class="button" title="Escolher câmera"></select>
+        <button id="bShot"  class="button">Capturar</button>
+        <button id="bStop"  class="button">Parar</button>
+        <button id="bSave"  class="button" disabled>Salvar foto</button>
+        <span class="hint">HTTPS/localhost. No Android, permita a câmera para este site.</span>
+      </div>
+      <img id="photo" class="preview" alt="Foto"/>
+      <canvas id="canvas" style="display:none"></canvas>`;
+    setTimeout(async()=>{
+      const cam = container.querySelector('#camView');
+      const bStart=container.querySelector('#bStart');
+      const bFlip=container.querySelector('#bFlip');
+      const bSel=container.querySelector('#bSel');
+      const bShot=container.querySelector('#bShot');
+      const bStop=container.querySelector('#bStop');
+      const bSave=container.querySelector('#bSave');
+      const cv=container.querySelector('#canvas');
+      const photo=container.querySelector('#photo');
+      if(!isSecureContext){
+        const w = container.querySelector('#secureWarn');
+        w.innerHTML = '<div class="hint">Contexto não seguro. Use HTTPS ou localhost.</div>';
+      }
+      await listCameras(bSel);
+      bSel.addEventListener('change', ()=>{ devId=bSel.value||null; });
+      bStart.addEventListener('click', async ()=>{
+        await camStart(cam);
+        await listCameras(bSel);
+        if(camStream){
+          const track = camStream.getVideoTracks()[0];
+          const set = track.getSettings();
+          if(set && set.deviceId){
+            devId = set.deviceId;
+            const opt=[...bSel.options].find(o=>o.value===devId); if(opt) bSel.value=devId;
+          }
+        }
+      });
+      bFlip.addEventListener('click', async ()=>{
+        if(!devId){ useFront=!useFront; if(camStream) await camStart(cam); }
+        else {
+          if(bSel.options.length>1){
+            const i=bSel.selectedIndex, n=(i+1)%bSel.options.length;
+            bSel.selectedIndex=n; devId=bSel.value; if(camStream) await camStart(cam);
+          }
+        }
+      });
+      bStop.addEventListener('click', ()=> camStop(cam));
+      bShot.addEventListener('click', ()=>{
+        if(!cam.videoWidth) return;
+        cv.width=cam.videoWidth; cv.height=cam.videoHeight;
+        cv.getContext('2d').drawImage(cam,0,0,cv.width,cv.height);
+        photo.src = cv.toDataURL('image/png');
+        photo.style.display='block';
+        bSave.disabled = false;
+        const flash=document.createElement('div');
+        flash.style.position='fixed';flash.style.inset='0';flash.style.background='#fff';flash.style.opacity='0.9';flash.style.transition='opacity .25s';flash.style.zIndex='1000';
+        document.body.appendChild(flash);
+        setTimeout(()=>{flash.style.opacity='0'; setTimeout(()=>flash.remove(), 220)}, 80);
+      });
+      bSave.addEventListener('click', ()=>{
+        if(!photo.src) return;
+        const a=document.createElement('a');
+        a.href=photo.src; a.download='foto-x1coOS-'+new Date().toISOString().replace(/[:.]/g,'-')+'.png';
+        document.body.appendChild(a); a.click(); a.remove();
+      });
+      win.querySelector('[data-act="close"]').addEventListener('click', ()=> camStop(cam));
+    },0);
+  }
+
+  // Start & icons
+  btnStart.addEventListener('click', e=>{ startMenu.classList.toggle('visible'); e.stopPropagation(); });
+  document.addEventListener('click', e=>{ if(!startMenu.contains(e.target) && e.target!==btnStart) startMenu.classList.remove('visible'); });
+  startMenu.querySelectorAll('button[data-app]').forEach(b=> b.addEventListener('click', ()=> openApp(b.getAttribute('data-app')) ));
+  iconGrid.addEventListener('click', e=>{ const card = e.target.closest('.appIcon'); if(!card) return; openApp(card.getAttribute('data-app')); }, {passive:true});
+
+  bBack.addEventListener('click', ()=>{
+    const wins=[...document.querySelectorAll('.window')];
+    const w = wins[wins.length-1]; if(!w) return;
+    const tid = w.dataset.id; w.remove(); rmTask(tid);
+    if(isMobile() && document.querySelectorAll('.window').length===0){
+      systemBar.classList.remove('visible');
+      taskbar.classList.remove('hideOnMobile');
+    }
+  });
+  bHome.addEventListener('click', ()=>{
+    document.querySelectorAll('.window').forEach(w=>w.remove());
+    tasks.innerHTML='';
+    systemBar.classList.remove('visible');
+    taskbar.classList.remove('hideOnMobile');
+  });
+  bRecents.addEventListener('click', ()=>{
+    startMenu.classList.toggle('visible');
+  });
+});
+</script>
+</body>
+</html>
