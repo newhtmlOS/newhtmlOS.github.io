@@ -165,18 +165,58 @@ body{color:var(--text);font:14px/1.35 Inter, ui-sans-serif, system-ui, -apple-sy
 }
 </style>
 
-<!-- x1coOS: Weather (tile + app) -->
-<style id="weather-css-v1">
-.appIcon.weather-tile{ position:relative; overflow:hidden; }
-.appIcon.weather-tile .wx-now{ position:absolute; inset:8px 8px auto 8px; display:flex; align-items:center; gap:6px; font-weight:800; font-size:14px; }
-.appIcon.weather-tile .wx-now .t{ font-size:18px }
-.appIcon.weather-tile .wx-city{ position:absolute; left:8px; right:8px; bottom:8px; font-size:11px; opacity:.9; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
-.appIcon.weather-tile .wx-ico{ width:22px; height:22px; line-height:0 }
-.appIcon.weather-tile .wx-ico svg{ width:100%; height:100% }
 
+<!-- x1coOS: Weather (WP live tile + app + noblur) -->
+<style id="weather-css-v2">
+/* Live Tile — tenta ocupar 2x (grid) e tem fallback para flex */
+.appIcon.weather-tile{
+  position:relative; overflow:hidden;
+  min-width:160px; min-height:160px;
+}
+/* Se o desktop usar CSS Grid, expandir 2x2 */
+#desktop, #iconGrid, #desktop .grid{
+  --wx-span-cols: 2;
+  --wx-span-rows: 2;
+}
+#desktop .grid .appIcon.weather-tile{ grid-column: span var(--wx-span-cols,2); grid-row: span var(--wx-span-rows,2); }
+.appIcon.weather-tile .wp-face{
+  position:absolute; inset:0; padding:10px; display:flex; flex-direction:column; justify-content:space-between;
+  border-radius:12px; background:rgba(255,255,255,.04); border:1px solid rgba(255,255,255,.16);
+  backface-visibility:hidden; -webkit-backface-visibility:hidden;
+}
+.appIcon.weather-tile .wp-front{ z-index:2; }
+.appIcon.weather-tile .wp-back{ transform: rotateY(180deg); }
+.appIcon.weather-tile .wp-flip{
+  position:absolute; inset:0; transform-style:preserve-3d;
+  animation: wxFlip 8s infinite ease-in-out;
+}
+@keyframes wxFlip{
+  0%,40%{ transform: rotateY(0deg); }
+  50%,90%{ transform: rotateY(180deg); }
+  100%{ transform: rotateY(360deg); }
+}
+.appIcon.weather-tile .row { display:flex; align-items:center; gap:8px; }
+.appIcon.weather-tile .bigT { font-size:42px; font-weight:900; line-height:1; }
+.appIcon.weather-tile .muted { color:#a8bfe9; font-size:12px; }
+.appIcon.weather-tile .ico { width:42px; height:42px; line-height:0; }
+.appIcon.weather-tile .ico svg{ width:100%; height:100%; }
+.appIcon.weather-tile .mini { display:flex; gap:10px; font-size:12px; }
+.appIcon.weather-tile .mini div{ display:flex; flex-direction:column; }
+.appIcon.weather-tile .lab { font-size:11px; opacity:.9; }
+
+/* Weather App (mesmo index, sem iframe) */
+.window[data-id^="w_wx_"] { z-index: 2147483200 !important; }
 .window[data-id^="w_wx_"] .content{ padding:0 !important; }
+.window[data-id^="w_wx_"],
+.window[data-id^="w_wx_"] *{ -webkit-backdrop-filter:none !important; backdrop-filter:none !important; }
+.window[data-id^="w_wx_"]::before,
+.window[data-id^="w_wx_"]::after,
+.window[data-id^="w_wx_"] *::before,
+.window[data-id^="w_wx_"] *::after{ display:none !important; content:none !important; pointer-events:none !important; }
+
 .wx-app{ display:flex; flex-direction:column; height:100%; background:rgba(255,255,255,.04); }
-.wx-app header{ display:flex; align-items:center; gap:10px; padding:10px 12px; border-bottom:1px solid rgba(255,255,255,.16); backdrop-filter:blur(10px) saturate(1.05); }
+.wx-app header{ display:flex; align-items:center; gap:10px; padding:10px 12px;
+  border-bottom:1px solid rgba(255,255,255,.16); background:rgba(11,18,32,.72); }
 .wx-app header .title{ font-weight:800 } .wx-app header .spacer{ flex:1 }
 .wx-app header .search{ display:flex; gap:8px }
 .wx-app header input{ height:36px; border-radius:10px; border:1px solid rgba(255,255,255,.18); background:rgba(255,255,255,.06); color:inherit; padding:0 10px; min-width:140px; }
@@ -1541,8 +1581,9 @@ document.addEventListener('DOMContentLoaded', () => {
 </script>
 
 
-<!-- x1coOS: Weather app + live tile (no iframe) -->
-<script id="weather-app-v1">
+
+<!-- x1coOS: Weather app + Windows Phone style live tile -->
+<script id="weather-app-v2">
 (function(){
   const ICONS = {
     sun: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M2 12h2M20 12h2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/></svg>',
@@ -1567,7 +1608,7 @@ document.addEventListener('DOMContentLoaded', () => {
     return m[code] || ['Tempo variável','cloud'];
   }
   async function fetchByCoords(lat, lon){
-    const url = `https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}&current_weather=true&hourly=temperature_2m,relative_humidity_2m,precipitation_probability&forecast_days=1`;
+    const url = `https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}&current_weather=true&hourly=temperature_2m,relative_humidity_2m,precipitation_probability&daily=temperature_2m_max,temperature_2m_min&forecast_days=1`;
     const r = await fetch(url); if(!r.ok) throw new Error('meteo');
     return r.json();
   }
@@ -1576,6 +1617,16 @@ document.addEventListener('DOMContentLoaded', () => {
     const r = await fetch(url); if(!r.ok) throw new Error('geo');
     const j = await r.json(); if(!j.results || !j.results.length) throw new Error('notfound');
     const c = j.results[0]; return { name: c.name + (c.admin1? ", "+c.admin1:"") + (c.country? " - "+c.country:""), lat: c.latitude, lon: c.longitude };
+  }
+  async function reverseGeocode(lat, lon){
+    const url = `https://geocoding-api.open-meteo.com/v1/reverse?latitude=${lat}&longitude=${lon}&language=pt&format=json`;
+    const r = await fetch(url); if(!r.ok) throw new Error('rev');
+    const j = await r.json();
+    if(j && j.results && j.results[0]){
+      const c = j.results[0];
+      return c.name + (c.admin1? ", "+c.admin1:"") + (c.country? " - "+c.country:"");
+    }
+    return null;
   }
   function getState(){ try{ const raw=localStorage.getItem('wx.state'); if(raw) return JSON.parse(raw);}catch{} return null; }
   function setState(s){ try{ localStorage.setItem('wx.state', JSON.stringify(s)); }catch{} }
@@ -1587,26 +1638,77 @@ document.addEventListener('DOMContentLoaded', () => {
     const cam = grid.querySelector('.appIcon[data-app="camera"]') || grid.querySelector('.appIcon');
     const tile = document.createElement('div');
     tile.className='appIcon weather-tile'; tile.dataset.app='weather';
-    tile.innerHTML = '<div class="wx-now"><span class="wx-ico">'+ICONS.sun+'</span><span class="t">--°</span></div><div class="wx-city">Localizando…</div><div class="label">Clima</div>';
+    tile.innerHTML = `
+      <div class="wp-flip">
+        <div class="wp-face wp-front">
+          <div class="row">
+            <div class="ico" data-k="ico"></div>
+            <div class="bigT" data-k="t">--°</div>
+          </div>
+          <div class="mini">
+            <div><span class="lab">Máx</span><span data-k="tmax">--°</span></div>
+            <div><span class="lab">Mín</span><span data-k="tmin">--°</span></div>
+            <div><span class="lab">Chuva</span><span data-k="pp">--%</span></div>
+          </div>
+        </div>
+        <div class="wp-face wp-back">
+          <div class="row" style="justify-content:space-between">
+            <div>
+              <div class="lab">Condição</div>
+              <div class="muted" data-k="desc">—</div>
+            </div>
+            <div style="text-align:right; max-width:60%">
+              <div class="lab">Local</div>
+              <div class="muted" data-k="city">Localizando…</div>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="label">Clima</div>`;
     if(cam && cam.parentNode===grid) insertAfter(tile, cam); else grid.appendChild(tile);
     tile.addEventListener('click', openAppWeather, {passive:true});
     return tile;
   }
+  function setTileData(tile, j, label){
+    const cw = j.current_weather;
+    const [desc, icon] = wxMap(cw.weathercode);
+    const tmax = (j.daily && j.daily.temperature_2m_max) ? Math.round(j.daily.temperature_2m_max[0]) : Math.round(cw.temperature);
+    const tmin = (j.daily && j.daily.temperature_2m_min) ? Math.round(j.daily.temperature_2m_min[0]) : Math.round(cw.temperature);
+    // precip prob prox horas: média das próximas 6h
+    let pp = 0;
+    if(j.hourly && Array.isArray(j.hourly.precipitation_probability)){
+      const nowH = new Date().getHours();
+      const arr = j.hourly.precipitation_probability.slice(nowH, nowH+6).filter(x=>x!=null);
+      if(arr.length) pp = Math.round(arr.reduce((a,b)=>a+b,0)/arr.length);
+    }
+    qs('[data-k="ico"]', tile).innerHTML = ICONS[icon] || ICONS.cloud;
+    qs('[data-k="t"]', tile).textContent = Math.round(cw.temperature)+'°';
+    qs('[data-k="tmax"]', tile).textContent = tmax+'°';
+    qs('[data-k="tmin"]', tile).textContent = tmin+'°';
+    qs('[data-k="pp"]', tile).textContent = pp+'%';
+    qs('[data-k="desc"]', tile).textContent = desc;
+    qs('[data-k="city"]', tile).textContent = label;
+    tile.title = `${desc} • ${Math.round(cw.temperature)}°`;
+  }
+
   async function updateTile(tile, st){
     try{
-      const data = await fetchByCoords(st.lat, st.lon);
-      const cw = data.current_weather;
-      const [desc, icon] = wxMap(cw.weathercode);
-      qs('.wx-ico', tile).innerHTML = ICONS[icon] || ICONS.cloud;
-      qs('.wx-now .t', tile).textContent = Math.round(cw.temperature)+'°';
-      qs('.wx-city', tile).textContent = st.label || (st.lat.toFixed(2)+', '+st.lon.toFixed(2));
-      tile.title = desc;
-    }catch(e){ qs('.wx-city', tile).textContent = 'Sem dados'; }
+      const j = await fetchByCoords(st.lat, st.lon);
+      const label = st.label || (await reverseGeocode(st.lat, st.lon)) || `${st.lat.toFixed(2)}, ${st.lon.toFixed(2)}`;
+      setTileData(tile, j, label);
+    }catch(e){
+      const city = st.label || 'Sem dados';
+      qs('[data-k="city"]', tile).textContent = city;
+    }
   }
   function locateAndUpdate(tile){
     if(navigator.geolocation){
-      navigator.geolocation.getCurrentPosition(pos=>{
+      navigator.geolocation.getCurrentPosition(async pos=>{
         const st = {lat:pos.coords.latitude, lon:pos.coords.longitude, label:'Minha localização'};
+        try{
+          const pretty = await reverseGeocode(st.lat, st.lon);
+          if(pretty) st.label = pretty;
+        }catch{}
         setState(st); updateTile(tile, st);
       }, _=>{ const st={lat:-23.55,lon:-46.63,label:'São Paulo - BR'}; setState(st); updateTile(tile, st); },
       {enableHighAccuracy:false, maximumAge:600000, timeout:8000});
@@ -1628,22 +1730,22 @@ document.addEventListener('DOMContentLoaded', () => {
     const btnClose = w.querySelector('[data-act="close"]'); if(btnClose) btnClose.addEventListener('click', ()=>w.remove());
     const btnGo = w.querySelector('#wxGo'); btnGo.addEventListener('click', async ()=>{
       const name = w.querySelector('#wxInput').value.trim(); if(!name) return;
-      try{ const c = await geocodeCity(name); setState({lat:c.lat, lon:c.lon, label:c.name}); await loadIntoApp({lat:c.lat,lon:c.lon,label:c.name}, w); const t=document.querySelector('.appIcon.weather-tile'); if(t) updateTile(t,{lat:c.lat,lon:c.lon,label:c.name}); }
+      try{ const c = await geocodeCity(name); const st2={lat:c.lat,lon:c.lon,label:c.name}; setState(st2); await loadIntoApp(st2, w); const t=document.querySelector('.appIcon.weather-tile'); if(t) updateTile(t, st2); }
       catch(e){ w.querySelector('#wxDesc').textContent = 'Cidade não encontrada'; }
     });
   }
   async function loadIntoApp(st, w){
     try{
-      const data = await fetchByCoords(st.lat, st.lon);
-      const cw = data.current_weather;
+      const j = await fetchByCoords(st.lat, st.lon);
+      const cw = j.current_weather;
       const [desc, icon] = wxMap(cw.weathercode);
       w.querySelector('#wxTemp').textContent = Math.round(cw.temperature)+'°C';
       w.querySelector('#wxDesc').textContent = desc;
-      w.querySelector('#wxLoc').textContent = st.label || (st.lat.toFixed(2)+', '+st.lon.toFixed(2));
+      w.querySelector('#wxLoc').textContent = st.label || (await reverseGeocode(st.lat, st.lon)) || (st.lat.toFixed(2)+', '+st.lon.toFixed(2));
       w.querySelector('#wxMeta').textContent = 'Vento: '+Math.round(cw.windspeed)+' km/h • Direção: '+Math.round(cw.winddirection)+'°';
       const list = w.querySelector('#wxHourly'); list.innerHTML='';
       const now = new Date(); const hour = now.getHours();
-      const h = data.hourly;
+      const h = j.hourly;
       for(let i=0;i<12;i++){
         const idx = hour + i; if(h.temperature_2m[idx]==null) break;
         const d = document.createElement('div'); d.className='wx-cell';
