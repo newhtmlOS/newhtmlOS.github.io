@@ -232,6 +232,73 @@ body{color:var(--text);font:14px/1.35 Inter, ui-sans-serif, system-ui, -apple-sy
 .wx-cell .t{ font-weight:700 } .wx-cell .h{ font-size:12px; color:#a8bfe9 }
 </style>
 
+
+<style id="weather-anim-css">
+/* Dynamic animations inside the live tile */
+.appIcon.weather-tile{ isolation:isolate }
+.appIcon.weather-tile .anim-layer{
+  position:absolute; inset:0; pointer-events:none; z-index:1;
+}
+/* Sun: subtle rotating rays */
+.appIcon.weather-tile.anim-sun .anim-layer::before{
+  content:""; position:absolute; inset:-10%; 
+  background: radial-gradient(circle at 50% 50%, rgba(255,215,100,.18), transparent 60%);
+  animation: sunPulse 6s ease-in-out infinite;
+}
+@keyframes sunPulse{ 0%,100%{ transform:scale(1); opacity:.6 } 50%{ transform:scale(1.06); opacity:.9 } }
+
+/* Cloud: slow horizontal drift */
+.appIcon.weather-tile.anim-cloud .anim-layer{
+  background: linear-gradient(90deg, rgba(255,255,255,.05), rgba(255,255,255,0) 40%, rgba(255,255,255,.05) 60%, rgba(255,255,255,0));
+  background-size: 200% 100%;
+  animation: cloudDrift 16s linear infinite;
+  opacity:.6;
+}
+@keyframes cloudDrift{ 0%{ background-position:0% 0 } 100%{ background-position:200% 0 } }
+
+/* Mist: subtle horizontal haze */
+.appIcon.weather-tile.anim-mist .anim-layer{
+  background: repeating-linear-gradient( to bottom, rgba(200,220,255,.06) 0 4px, transparent 4px 10px );
+  animation: mistMove 10s linear infinite;
+}
+@keyframes mistMove{ from{ transform: translateX(-4%)} to { transform: translateX(4%)} }
+
+/* Rain: falling drops */
+.appIcon.weather-tile.anim-rain .anim-layer span{
+  position:absolute; width:2px; height:10px; background:rgba(130,180,255,.9);
+  border-radius:1px; filter:blur(.2px);
+  animation: drop 1.2s linear infinite;
+  opacity:.9;
+}
+@keyframes drop{ 0%{ transform: translateY(-15%)} 100%{ transform: translateY(120%)} }
+
+/* Snow: falling flakes */
+.appIcon.weather-tile.anim-snow .anim-layer span{
+  position:absolute; width:3px; height:3px; background:rgba(240,250,255,.95);
+  border-radius:50%;
+  animation: snow 3.5s linear infinite;
+  opacity:.95; filter: drop-shadow(0 0 2px rgba(255,255,255,.6));
+}
+@keyframes snow{ 0%{ transform: translateY(-10%) translateX(0) } 100%{ transform: translateY(120%) translateX(10%) } }
+
+/* Storm: flashes */
+.appIcon.weather-tile.anim-storm .anim-layer::after{
+  content:""; position:absolute; inset:0; background:rgba(255,255,255,.0);
+  animation: flash 5s ease-in-out infinite;
+}
+@keyframes flash{
+  0%, 79%, 100%{ background:rgba(255,255,255,0) }
+  80%{ background:rgba(255,255,255,.25) }
+  81%{ background:rgba(255,255,255,0) }
+  86%{ background:rgba(255,255,255,.18) }
+  87%{ background:rgba(255,255,255,0) }
+}
+
+/* Ensure label stays above animation */
+.appIcon.weather-tile .label{ position:absolute; left:10px; bottom:8px; z-index:3 }
+.appIcon.weather-tile .wp-flip{ z-index:2 }
+</style>
+
 </head>
 <body>
 <div id="root">
@@ -1669,6 +1736,35 @@ document.addEventListener('DOMContentLoaded', () => {
     tile.addEventListener('click', openAppWeather, {passive:true});
     return tile;
   }
+  
+  function ensureAnim(tile, kind){
+    // wipe previous
+    tile.classList.remove('anim-sun','anim-cloud','anim-rain','anim-snow','anim-storm','anim-mist');
+    const old = tile.querySelector('.anim-layer'); if(old) old.remove();
+    // map kind -> class and overlay content
+    let cls = 'anim-'+(kind||'cloud');
+    tile.classList.add(cls);
+    const layer = document.createElement('div');
+    layer.className = 'anim-layer';
+    // particles for rain/snow
+    if(kind==='rain' || kind==='snow'){
+      const n = 20;
+      for(let i=0;i<n;i++){
+        const s = document.createElement('span');
+        s.style.left = Math.round(Math.random()*100)+'%';
+        s.style.animationDelay = (Math.random()*1.2).toFixed(2)+'s';
+        s.style.opacity = (kind==='rain' ? (0.6+Math.random()*0.4) : (0.7+Math.random()*0.3)).toFixed(2);
+        if(kind==='snow'){
+          s.style.width = (2+Math.random()*2).toFixed(0)+'px';
+          s.style.height = s.style.width;
+          s.style.animationDuration = (2.8+Math.random()*2.5).toFixed(2)+'s';
+        }
+        layer.appendChild(s);
+      }
+    }
+    tile.appendChild(layer);
+  }
+
   function setTileData(tile, j, label){
     const cw = j.current_weather;
     const [desc, icon] = wxMap(cw.weathercode);
@@ -1688,7 +1784,10 @@ document.addEventListener('DOMContentLoaded', () => {
     qs('[data-k="pp"]', tile).textContent = pp+'%';
     qs('[data-k="desc"]', tile).textContent = desc;
     qs('[data-k="city"]', tile).textContent = label;
-    tile.title = `${desc} • ${Math.round(cw.temperature)}°`;
+    tile.title = tile.title = `${desc} • ${Math.round(cw.temperature)}°`;
+  
+    // choose animation by icon key
+    ensureAnim(tile, icon);
   }
 
   async function updateTile(tile, st){
