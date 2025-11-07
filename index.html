@@ -238,10 +238,7 @@ body{color:var(--text);font:14px/1.35 Inter, ui-sans-serif, system-ui, -apple-sy
   <div class="desktop" id="desktop">
     <div class="wallpaper">
       <div class="homeActions">
-        <button id="homeFullscreen" class="fsBtn" title="Tela cheia do sistema" aria-label="Tela cheia">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M8 3H3v5M16 3h5v5M21 16v5h-5M3 16v5h5"/></svg>
-          <span id="fsLabel">Tela cheia</span>
-        </button>
+        <!-- removed: homeFullscreen button -->
       </div>
       <div class="grid" id="iconGrid">
         <div class="appIcon" data-app="assistant"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="12" cy="12" r="9" opacity=".2"/><path d="M8 12h8M12 8v8"/></svg><div class="label">Assistente</div></div>
@@ -330,7 +327,7 @@ document.addEventListener('DOMContentLoaded', () => {
     try{
       if(el.requestFullscreen) await el.requestFullscreen();
       else if(el.webkitRequestFullscreen) await el.webkitRequestFullscreen();
-      fsLabel.textContent = 'Sair de tela cheia';
+      if (fsLabel) fsLabel.textContent = 'Sair de tela cheia';
     }catch(e){
       alert('Seu navegador pode bloquear tela cheia aqui. Em iOS, instale como app (PWA) para melhor efeito.');
     }
@@ -339,13 +336,13 @@ document.addEventListener('DOMContentLoaded', () => {
     try{
       if(document.fullscreenElement && document.exitFullscreen) await document.exitFullscreen();
       else if(document.webkitFullscreenElement && document.webkitExitFullscreen) await document.webkitExitFullscreen();
-      fsLabel.textContent = 'Tela cheia';
+      if (fsLabel) fsLabel.textContent = 'Tela cheia';
     }catch(e){}
   }
-  function syncFsLabel(){ fsLabel.textContent = fsActive() ? 'Sair de tela cheia' : 'Tela cheia'; }
+  function syncFsLabel(){ if (fsLabel) fsLabel.textContent = fsActive() ? 'Sair de tela cheia' : 'Tela cheia'; }
   document.addEventListener('fullscreenchange', syncFsLabel);
   document.addEventListener('webkitfullscreenchange', syncFsLabel);
-  homeFS.addEventListener('click', ()=>{ fsActive() ? exitFullscreen() : enterFullscreen(); });
+  if (homeFS) homeFS.addEventListener('click', ()=>{ fsActive() ? exitFullscreen() : enterFullscreen(); });
 
   function addTask(id, title){
     const b = document.createElement('button'); b.className='taskBtn'; b.textContent=title; b.dataset.win=id;
@@ -1772,5 +1769,6 @@ document.addEventListener('DOMContentLoaded', () => {
 })();
 </script>
 
+<span id="fsLabel" style="display:none"></span>
 </body>
 </html>
