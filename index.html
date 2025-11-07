@@ -1822,12 +1822,9 @@ document.addEventListener('DOMContentLoaded', () => {
   function show(){ term.classList.add("show"); document.documentElement.classList.add("terminal-open"); document.body.classList.add("terminal-open"); inpEl && inpEl.focus(); }
   function hide(){ term.classList.remove("show"); document.documentElement.classList.remove("terminal-open"); document.body.classList.remove("terminal-open"); }
 
-  // URL triggers: /padrao (path), ?padrao, or #/padrao
+  // URL trigger super simples: se a URL tiver "padrao" em qualquer parte, abre
   try{
-    const path = (location.pathname||"").toLowerCase();
-    const qs   = (location.search||"").toLowerCase();
-    const hash = (location.hash||"").toLowerCase();
-    if (/(^|\/)padrao\/?$/.test(path) || /[?&]padrao(=|&|$)/.test(qs) || /(^|#|\/)padrao$/.test(hash)){
+    if ((location.href||"").toLowerCase().indexOf("padrao") !== -1){
       show();
     }
   }catch(e){ /* ignore */ }
