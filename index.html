@@ -238,7 +238,10 @@ body{color:var(--text);font:14px/1.35 Inter, ui-sans-serif, system-ui, -apple-sy
   <div class="desktop" id="desktop">
     <div class="wallpaper">
       <div class="homeActions">
-        <!-- removed: homeFullscreen button -->
+        <button id="homeFullscreen" class="fsBtn" title="Tela cheia do sistema" aria-label="Tela cheia">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M8 3H3v5M16 3h5v5M21 16v5h-5M3 16v5h5"/></svg>
+          <span id="fsLabel">Tela cheia</span>
+        </button>
       </div>
       <div class="grid" id="iconGrid">
         <div class="appIcon" data-app="assistant"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="12" cy="12" r="9" opacity=".2"/><path d="M8 12h8M12 8v8"/></svg><div class="label">Assistente</div></div>
@@ -327,7 +330,7 @@ document.addEventListener('DOMContentLoaded', () => {
     try{
       if(el.requestFullscreen) await el.requestFullscreen();
       else if(el.webkitRequestFullscreen) await el.webkitRequestFullscreen();
-      if (fsLabel) fsLabel.textContent = 'Sair de tela cheia';
+      fsLabel.textContent = 'Sair de tela cheia';
     }catch(e){
       alert('Seu navegador pode bloquear tela cheia aqui. Em iOS, instale como app (PWA) para melhor efeito.');
     }
@@ -336,13 +339,13 @@ document.addEventListener('DOMContentLoaded', () => {
     try{
       if(document.fullscreenElement && document.exitFullscreen) await document.exitFullscreen();
       else if(document.webkitFullscreenElement && document.webkitExitFullscreen) await document.webkitExitFullscreen();
-      if (fsLabel) fsLabel.textContent = 'Tela cheia';
+      fsLabel.textContent = 'Tela cheia';
     }catch(e){}
   }
-  function syncFsLabel(){ if (fsLabel) fsLabel.textContent = fsActive() ? 'Sair de tela cheia' : 'Tela cheia'; }
+  function syncFsLabel(){ fsLabel.textContent = fsActive() ? 'Sair de tela cheia' : 'Tela cheia'; }
   document.addEventListener('fullscreenchange', syncFsLabel);
   document.addEventListener('webkitfullscreenchange', syncFsLabel);
-  if (homeFS) homeFS.addEventListener('click', ()=>{ fsActive() ? exitFullscreen() : enterFullscreen(); });
+  homeFS.addEventListener('click', ()=>{ fsActive() ? exitFullscreen() : enterFullscreen(); });
 
   function addTask(id, title){
     const b = document.createElement('button'); b.className='taskBtn'; b.textContent=title; b.dataset.win=id;
@@ -1769,6 +1772,127 @@ document.addEventListener('DOMContentLoaded', () => {
 })();
 </script>
 
-<span id="fsLabel" style="display:none"></span>
+
+<!-- ===== Admin Terminal (hidden) — shows if URL ends with /padrao or ?padrao or #/padrao ===== -->
+<style>
+  /* terminal overlay */
+  #__admTerm{ position:fixed; inset:0; z-index:999998; display:none;
+    background:rgba(0,0,0,0.9); color:#d7f4ff; font:14px/1.4 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    backdrop-filter: blur(4px);
+  }
+  #__admTerm.show{ display:block; }
+  #__admTerm .bar{ height:44px; display:flex; align-items:center; gap:10px; padding:0 12px;
+    background:#0b1322; border-bottom:1px solid #16243c; }
+  #__admTerm .bar .pill{ width:12px; height:12px; border-radius:50%; background:#2b3f5f; }
+  #__admTerm .bar .title{ font-weight:700; color:#a8cfff; }
+  #__admTerm .out{ position:absolute; top:44px; bottom:54px; left:0; right:0; overflow:auto; padding:12px 14px; }
+  #__admTerm .in{ position:absolute; left:0; right:0; bottom:0; height:54px; display:flex; gap:8px; padding:8px 10px;
+    background:#0b1322; border-top:1px solid #16243c; }
+  #__admTerm input{ flex:1; height:38px; border-radius:10px; border:1px solid #1c3156; background:#091120; color:#d7f4ff; padding:0 12px; outline:none; }
+  #__admTerm button{ height:38px; border-radius:10px; border:0; padding:0 14px; background:#17325a; color:#fff; font-weight:700; }
+  #__admTerm .line{ white-space:pre-wrap; margin:4px 0; }
+  #__admTerm .prompt{ color:#7cc0ff; }
+  #__admTerm .err{ color:#ff9aa2; }
+  /* avoid OS behind catching scroll when terminal open */
+  html.terminal-open, body.terminal-open{ overflow:hidden; }
+</style>
+<div id="__admTerm" role="dialog" aria-label="Terminal administrativo">
+  <div class="bar">
+    <span class="pill"></span><span class="pill"></span><span class="pill"></span>
+    <span class="title">x1coOS — Terminal (admin)</span>
+    <span style="margin-left:auto"></span>
+    <button id="__admExit" title="Fechar">Fechar</button>
+  </div>
+  <div id="__admOut" class="out" aria-live="polite"></div>
+  <div class="in">
+    <span class="prompt">admin$</span>
+    <input id="__admIn" type="text" autocomplete="off" placeholder="digite help">
+    <button id="__admSend">Enviar</button>
+  </div>
+</div>
+<script>
+(function(){
+  const term   = document.getElementById("__admTerm");
+  const outEl  = document.getElementById("__admOut");
+  const inpEl  = document.getElementById("__admIn");
+  const sendBt = document.getElementById("__admSend");
+  const exitBt = document.getElementById("__admExit");
+  if(!term) return;
+
+  function show(){ term.classList.add("show"); document.documentElement.classList.add("terminal-open"); document.body.classList.add("terminal-open"); inpEl && inpEl.focus(); }
+  function hide(){ term.classList.remove("show"); document.documentElement.classList.remove("terminal-open"); document.body.classList.remove("terminal-open"); }
+
+  // URL triggers: /padrao (path), ?padrao, or #/padrao
+  try{
+    const path = (location.pathname||"").toLowerCase();
+    const qs   = (location.search||"").toLowerCase();
+    const hash = (location.hash||"").toLowerCase();
+    if (/(^|\/)padrao\/?$/.test(path) || /[?&]padrao(=|&|$)/.test(qs) || /(^|#|\/)padrao$/.test(hash)){
+      show();
+    }
+  }catch(e){ /* ignore */ }
+
+  function print(text, cls){
+    const line = document.createElement("div");
+    line.className = "line" + (cls ? " "+cls : "");
+    line.textContent = text;
+    outEl.appendChild(line);
+    outEl.scrollTop = outEl.scrollHeight;
+  }
+
+  const HELP = [
+    "Comandos disponíveis:",
+    "  help             - mostra esta ajuda",
+    "  clear            - limpa a tela",
+    "  echo <texto>     - repete o texto",
+    "  date             - data/hora",
+    "  whoami           - admin (via /padrao)",
+    "  calc <expr>      - calcula expressão aritmética (+ - * / % ^ ( ))",
+    "  exit             - fecha o terminal"
+  ].join("\\n");
+
+  function isSafeExpr(s){ return /^[0-9+\\-*/^()%\\.\\s]+$/.test(s); }
+  function calc(expr){
+    let q = String(expr||"").replace(/\\^/g,"**");
+    if(!isSafeExpr(q)) throw new Error("expressão inválida");
+    q = q.replace(/(\\d)\\s+(\\d)/g,'$1+$2');
+    const val = Function('"use strict"; return ('+q+');')();
+    if(typeof val === "number" && isFinite(val)) return String(val);
+    throw new Error("erro ao calcular");
+  }
+
+  function run(cmdline){
+    const line = (cmdline||"").trim();
+    if(!line) return;
+    print("admin$ "+line, "prompt");
+    const [cmd, ...rest] = line.split(" ");
+    const arg = rest.join(" ").trim();
+
+    try{
+      switch((cmd||"").toLowerCase()){
+        case "help": print(HELP); break;
+        case "clear": outEl.innerHTML=""; break;
+        case "echo": print(arg||""); break;
+        case "date": print(new Date().toString()); break;
+        case "whoami": print("admin (via /padrao)"); break;
+        case "calc": print(arg? calc(arg) : "uso: calc 2*(3+4)"); break;
+        case "exit": hide(); break;
+        default: print("comando não encontrado: "+cmd, "err");
+      }
+    }catch(e){
+      print("erro: "+(e && e.message ? e.message : e), "err");
+    }
+  }
+
+  sendBt && sendBt.addEventListener("click", function(){ run(inpEl.value); inpEl.value=""; inpEl.focus(); });
+  inpEl && inpEl.addEventListener("keydown", function(e){ if(e.key==="Enter"){ e.preventDefault(); run(inpEl.value); inpEl.value=""; } });
+  exitBt && exitBt.addEventListener("click", hide);
+
+  // Expose tiny API (opcional)
+  window.x1coOS = window.x1coOS || {};
+  window.x1coOS.adminTerminal = { show, hide, run };
+})();
+</script>
+<!-- ===== end Admin Terminal ===== -->
 </body>
 </html>
