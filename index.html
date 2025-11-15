@@ -1,0 +1,79 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>htmlOS Loader</title>
+<style>
+body{
+  font-family: system-ui, -apple-system, "Segoe UI", Roboto, Arial;
+  background:#0b1220;
+  color:#e6eef8;
+  padding:20px;
+}
+#log{white-space:pre-wrap;font-size:14px;opacity:.75;margin-top:18px}
+.box{
+  max-width:420px;
+  margin:auto;
+  padding:20px;
+  border-radius:14px;
+  background:rgba(255,255,255,0.06);
+  border:1px solid rgba(255,255,255,0.14);
+  box-shadow:0 0 22px rgba(0,0,0,.45);
+}
+</style>
+</head>
+
+<body>
+<div class="box">
+<h2>htmlOS — Loader</h2>
+<p>Montando o sistema no dispositivo…</p>
+<pre id="log">Iniciando…</pre>
+</div>
+
+<script>
+(async function(){
+
+  const log = document.getElementById('log');
+  function L(msg){ log.textContent += "\n" + msg; }
+
+  const partes = [
+    "parte1.html",
+    "parte2.html",
+    "parte3.html",
+    "parte4.html"
+  ];
+
+  L("Carregando partes: " + partes.join(", "));
+
+  try{
+
+    const textos = await Promise.all(
+      partes.map(async p => {
+        L("→ carregando " + p + "...");
+        const r = await fetch(p);
+        if(!r.ok) throw new Error("Falha ao carregar " + p);
+        return await r.text();
+      })
+    );
+
+    L("Concatenando as partes…");
+    const final = textos.join("\n");
+
+    L("Criando arquivo virtual…");
+    const blob = new Blob([final], {type:"text/html"});
+    const url  = URL.createObjectURL(blob);
+
+    L("Abrindo htmlOS…");
+    location.href = url;
+
+  }catch(e){
+    L("ERRO: " + e.message);
+    L("Verifique se os arquivos parte1.html até parte4.html estão no MESMO diretório do index-loader.html");
+  }
+
+})();
+</script>
+
+</body>
+</html>

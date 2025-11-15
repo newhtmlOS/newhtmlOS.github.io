@@ -1,0 +1,183 @@
+async function fetchWX(lat, lon){
+    const url = `https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}&current_weather=true`;
+    const r = await fetch(url);
+    const j = await r.json();
+    return j.current_weather;
+  }
+
+  function renderWX(win, data){
+    const main = win.querySelector('.wx-app main');
+    const card = document.createElement('div');
+    card.className = 'wx-card';
+
+    const [label, ico] = wxMap(data.weathercode);
+
+    card.innerHTML = `
+      <div class="wx-row">
+        <div class="wx-temp">${Math.round(data.temperature)}°</div>
+        <div class="wx-muted">${label}</div>
+        <div class="wx-ico">${ICONS[ico]}</div>
+      </div>
+      <div class="wx-list">
+        <div class="wx-cell">
+          <div class="wx-ico">${ICONS.sun}</div>
+          <div class="wx-t">${Math.round(data.temperature + 1)}°</div>
+          <div class="wx-h">Alta</div>
+        </div>
+        <div class="wx-cell">
+          <div class="wx-ico">${ICONS.cloud}</div>
+          <div class="wx-t">${Math.round(data.temperature - 1)}°</div>
+          <div class="wx-h">Baixa</div>
+        </div>
+        <div class="wx-cell">
+          <div class="wx-ico">${ICONS.rain}</div>
+          <div class="wx-t">${Math.round(data.windspeed)} km/h</div>
+          <div class="wx-h">Vento</div>
+        </div>
+        <div class="wx-cell">
+          <div class="wx-ico">${ICONS.storms}</div>
+          <div class="wx-t">${Math.round(data.winddirection)}°</div>
+          <div class="wx-h">Direção</div>
+        </div>
+      </div>
+    `;
+    main.innerHTML = '';
+    main.appendChild(card);
+  }
+
+  function openWXApp(){
+    const id = 'w_wx_' + Date.now();
+    const w = createWindowHtmlOS({
+      id,
+      title: 'Clima',
+      content: `
+        <div class="wx-app">
+          <header>
+            <div class="title">Clima agora</div>
+            <div class="spacer"></div>
+            <div class="search">
+              <input id="wx-lat" placeholder="Lat">
+              <input id="wx-lon" placeholder="Lon">
+              <button id="wx-go">OK</button>
+            </div>
+          </header>
+          <main></main>
+        </div>
+      `
+    });
+
+    const lat = -29.888;  
+    const lon = -50.266;  
+
+    fetchWX(lat, lon).then(d => renderWX(w, d));
+
+    w.querySelector('#wx-go').onclick = () => {
+      const nLat = parseFloat(w.querySelector('#wx-lat').value);
+      const nLon = parseFloat(w.querySelector('#wx-lon').value);
+      if(!isNaN(nLat) && !isNaN(nLon)){
+        fetchWX(nLat, nLon).then(d => renderWX(w, d));
+      }
+    };
+  }
+
+  window.openWXApp = openWXApp;
+})();
+</script>
+
+<style>
+/* --------------------------- */
+/* STATUSBAR htmlOS (WiFi / Bateria / Dados Móveis) */
+/* --------------------------- */
+#statusItems{
+  display:flex;
+  gap:10px;
+  align-items:center;
+  margin-right:12px;
+  font-size:13px
+}
+.statusBtn{
+  display:inline-flex;
+  align-items:center;
+  gap:6px;
+  padding:6px 8px;
+  border-radius:8px;
+  background:rgba(255,255,255,0.02);
+  border:1px solid rgba(255,255,255,0.04);
+  pointer-events:auto
+}
+.statusIcon{
+  width:18px;
+  height:18px;
+  display:inline-block
+}
+.statusLabel{
+  min-width:44px;
+  text-align:left;
+  color:var(--muted);
+  font-size:13px
+}
+.battPercent{
+  font-variant-numeric:tabular-nums;
+  font-weight:700
+}
+</style>
+
+<script>
+document.addEventListener('DOMContentLoaded', function(){
+  const topBar = document.querySelector('.taskbar .clock')?.parentElement;
+  if(!topBar) return;
+
+  const status = document.createElement('div');
+  status.id = 'statusItems';
+
+  const wifiBtn = document.createElement('div');
+  wifiBtn.className = 'statusBtn';
+  wifiBtn.innerHTML = `
+    <svg class="statusIcon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8">
+      <path d="M2 9c6-6 16-6 22 0" stroke-linecap="round"/>
+      <path d="M5.5 12c3.5-3.5 11-3.5 14.5 0" stroke-linecap="round"/>
+      <circle cx="12" cy="17" r="1.6"/>
+    </svg>
+    <div class="statusLabel" id="wifiLabel">--</div>`;
+  status.appendChild(wifiBtn);
+
+  const battBtn = document.createElement('div');
+  battBtn.className = 'statusBtn';
+  battBtn.innerHTML = `
+    <svg class="statusIcon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6">
+      <rect x="2" y="6" width="16" height="12" rx="2"/>
+      <rect x="18" y="9" width="2" height="6" rx="1"/>
+      <rect class="battFill" x="3" y="7" width="14" height="10" rx="1" fill="currentColor" opacity="0.2"/>
+    </svg>
+    <div class="statusLabel"><span id="battPct" class="battPercent">--%</span></div>`;
+  status.appendChild(battBtn);
+
+  const mobileBtn = document.createElement('div');
+  mobileBtn.className = 'statusBtn';
+  mobileBtn.innerHTML = `
+    <svg class="statusIcon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6">
+      <path d="M4 20v-8a8 8 0 0116 0v8"/>
+      <path d="M8 20v-4a4 4 0 018 0v4"/>
+    </svg>
+    <div class="statusLabel" id="mobileLabel">Off</div>`;
+  status.appendChild(mobileBtn);
+
+  topBar.prepend(status);
+
+  function updateOnline(){
+    const lbl = document.getElementById('wifiLabel');
+    const online = navigator.onLine;
+    lbl.textContent = online ? 'Online' : 'Offline';
+    wifiBtn.style.opacity = online ? '1' : '0.45';
+  }
+  window.addEventListener('online', updateOnline);
+  window.addEventListener('offline', updateOnline);
+  updateOnline();
+
+  async function bindBattery(){
+    const pctEl = document.getElementById('battPct');
+    try{
+      if('getBattery' in navigator){
+        const bat = await navigator.getBattery();
+        function paint(){
+          const lvl = Math.round(bat.level*100);
