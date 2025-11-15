@@ -1,32 +1,24 @@
 <!doctype html>
-<html lang="pt-BR">
+<html>
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>htmlOS Loader</title>
 <style>
 body{
-  font-family:system-ui,-apple-system,"Segoe UI",Roboto,Arial;
   background:#0b1220;
   color:#e6eef8;
+  font-family:system-ui,Segoe UI,Roboto;
   padding:20px;
 }
 #log{white-space:pre-line;opacity:.7;margin-top:12px}
-.box{
-  max-width:420px;margin:auto;padding:20px;border-radius:12px;
-  background:rgba(255,255,255,0.06);
-  border:1px solid rgba(255,255,255,0.15);
-  box-shadow:0 0 18px rgba(0,0,0,.45);
-}
 </style>
 </head>
 
 <body>
-<div class="box">
-<h2>htmlOS — Loader</h2>
-<p>Montando o sistema na RAM…</p>
+<h2>htmlOS Loader</h2>
+<p>Preparando ambiente…</p>
 <pre id="log">Iniciando…</pre>
-</div>
 
 <script>
 (async()=>{
@@ -48,23 +40,21 @@ body{
       })
     );
 
-    L("Concatenando…");
+    L("Criando index virtual…");
     const final = textos.join("\n");
 
-    L("Criando arquivo virtual…");
     const blob = new Blob([final], {type:"text/html"});
     const url  = URL.createObjectURL(blob);
 
-    L("Iniciando htmlOS…");
+    L("Abrindo htmlOS em nova aba…");
 
-    // SUBSTITUI COMPLETAMENTE a página atual
-    document.open();
-    document.write(`<iframe src="${url}" style="position:fixed;inset:0;border:none;width:100%;height:100%"></iframe>`);
-    document.close();
+    // AQUI É A MÁGICA:
+    window.open(url, "_blank");
+
+    L("\nSe nada aconteceu, habilite pop-ups para esta página.");
 
   }catch(e){
     L("ERRO: " + e.message);
-    L("Confere se as partes estão no MESMO diretório do loader.");
   }
 
 })();
