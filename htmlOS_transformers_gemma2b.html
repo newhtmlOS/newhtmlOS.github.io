@@ -1,0 +1,179 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>htmlOS — Assistente (Gemma-2B Lite via transformers.js)</title>
+<style>
+  :root { --bg:#0b0b0d; --panel:#0f1113; --fg:#e6eef6; --muted:#9aa6b2; --accent:#4f9cff; }
+  body{margin:0;height:100vh;background:linear-gradient(180deg,#07070a,#0b0b0d);color:var(--fg);font-family:Inter,system-ui,Segoe UI,Roboto,Arial;}
+  .window{max-width:900px;margin:24px auto;padding:18px;border-radius:12px;background:var(--panel);box-shadow:0 8px 30px rgba(0,0,0,0.6);height:80vh;display:flex;flex-direction:column}
+  .header{display:flex;align-items:center;gap:12px;margin-bottom:8px}
+  .title{font-weight:700}
+  #status{color:var(--muted);font-size:13px}
+  #chat{flex:1;overflow:auto;padding:12px;border-radius:8px;background:rgba(255,255,255,0.02);margin:8px 0}
+  .msg{margin:8px 0;display:flex}
+  .msg.me{justify-content:flex-end}
+  .bubble{max-width:78%;padding:10px 14px;border-radius:12px;background:rgba(255,255,255,0.03);white-space:pre-wrap}
+  .bubble.me{background:linear-gradient(90deg, rgba(79,156,255,0.16), rgba(79,156,255,0.08));}
+  .input{display:flex;gap:8px;align-items:center}
+  input[type=text]{flex:1;padding:12px;border-radius:10px;border:1px solid rgba(255,255,255,0.04);background:transparent;color:var(--fg);outline:none}
+  button{padding:10px 12px;border-radius:10px;border:none;background:var(--accent);color:#fff;cursor:pointer}
+  .muted{color:var(--muted);font-size:13px;margin-top:6px}
+  .logbox{font-family:monospace;font-size:12px;color:var(--muted);margin-top:8px;white-space:pre-wrap;max-height:88px;overflow:auto;background:rgba(255,255,255,0.01);padding:8px;border-radius:8px}
+</style>
+</head>
+<body>
+<div class="window" role="main" aria-label="Assistente IA">
+  <div class="header">
+    <div class="title">Assistente (Gemma-2B Lite)</div>
+    <div id="status">— iniciando</div>
+  </div>
+
+  <div id="chat" aria-live="polite"></div>
+
+  <div class="input">
+    <input id="input" type="text" placeholder="Pergunte algo — ex: 'Quem foi Einstein?'" />
+    <button id="send">Enviar</button>
+  </div>
+
+  <div class="muted">Carregando transformers.js e o modelo Xenova/gemma-2b-it-q4f16_1. Pode demorar no primeiro uso.</div>
+  <div id="debug" class="logbox" aria-hidden="false">log:\n</div>
+</div>
+
+<script>
+(function(){
+  const status = document.getElementById('status');
+  const chat = document.getElementById('chat');
+  const debug = document.getElementById('debug');
+  const input = document.getElementById('input');
+  const send = document.getElementById('send');
+
+  function logDebug(...args){
+    console.log(...args);
+    debug.textContent += '\\n' + args.map(a=> (typeof a==='string'? a : JSON.stringify(a))).join(' ');
+    debug.scrollTop = debug.scrollHeight;
+  }
+
+  function appendMsg(text, who='ai'){
+    const d = document.createElement('div');
+    d.className = 'msg ' + (who==='me'?'me':'');
+    const b = document.createElement('div');
+    b.className = 'bubble ' + (who==='me'?'me':'');
+    b.textContent = text;
+    d.appendChild(b);
+    chat.appendChild(d);
+    chat.scrollTop = chat.scrollHeight;
+  }
+
+  // CDN candidates (try in order)
+  const cdns = [
+    'https://cdn.jsdelivr.net/npm/@xenova/transformers@2.9.0/dist/transformers.min.js',
+    'https://cdn.jsdelivr.net/npm/@xenova/transformers@2.8.0/dist/transformers.min.js',
+    'https://cdn.jsdelivr.net/npm/@xenova/transformers@2.7.0/dist/transformers.min.js'
+  ];
+
+  function loadScript(url){
+    return new Promise((resolve,reject)=>{
+      const s = document.createElement('script');
+      s.src = url;
+      s.onload = ()=> resolve(url);
+      s.onerror = (e)=> reject(new Error('failed to load ' + url));
+      document.head.appendChild(s);
+    });
+  }
+
+  async function tryLoadCdns(){
+    for(const u of cdns){
+      try{
+        status.textContent = ' — carregando runtime transformers.js ('+u.split('@')[1]+')...';
+        logDebug('tentando CDN', u);
+        await loadScript(u);
+        if(window.transformers || window.Transformers){
+          logDebug('runtime pronto via', u);
+          return true;
+        } else {
+          logDebug('runtime não expõe global em', u, 'globals:', Object.keys(window).slice(-20));
+        }
+      }catch(err){
+        logDebug('falha CDN', u, err.message);
+      }
+    }
+    return false;
+  }
+
+  let pipeline = null;
+
+  async function initPipeline(){
+    status.textContent = ' — inicializando pipeline...';
+    logDebug('inicializando pipeline');
+    try{
+      const t = window.transformers || window.Transformers;
+      if(!t) throw new Error('transformers runtime não encontrado (window.transformers)');
+
+      // try webgpu, then wasm, then cpu
+      if(t.setBackend){
+        try{ await t.setBackend('webgpu'); logDebug('backend set to webgpu'); }catch(e){ logDebug('webgpu failed', e.message); }
+      }
+
+      const modelId = 'Xenova/gemma-2b-it-q4f16_1';
+      status.textContent = ' — baixando modelo '+modelId+' ...';
+      logDebug('request pipeline for', modelId);
+
+      pipeline = await t.pipeline('text-generation', modelId, {progress:true, quantization:'q4f16'});
+      status.textContent = ' — pronto (modelo carregado)';
+      appendMsg('Assistente pronto. Pergunte algo!', 'ai');
+      logDebug('pipeline ready');
+    }catch(err){
+      status.textContent = ' — erro ao iniciar pipeline';
+      logDebug('initPipeline error', String(err));
+      appendMsg('Erro ao carregar modelo: ' + String(err), 'ai');
+    }
+  }
+
+  async function start(){
+    try{
+      const ok = await tryLoadCdns();
+      if(!ok){
+        status.textContent = ' — falha ao carregar runtime (CDN)';
+        appendMsg('Não foi possível carregar transformers.js via CDN. Confira a consola (debug).', 'ai');
+        return;
+      }
+      await initPipeline();
+    }catch(e){
+      logDebug('start error', e);
+      status.textContent = ' — erro genérico';
+      appendMsg('Erro genérico: ' + String(e), 'ai');
+    }
+  }
+
+  input.addEventListener('keydown', (e)=>{ if(e.key==='Enter') send.click(); });
+  send.addEventListener('click', async ()=>{
+    const text = input.value.trim(); if(!text) return; input.value='';
+    appendMsg(text,'me');
+    if(!pipeline){
+      appendMsg('Modelo não pronto. Aguarde...', 'ai'); return;
+    }
+    appendMsg('Gerando resposta...', 'ai');
+    try{
+      const out = await pipeline(text, {max_new_tokens:200, do_sample:true, temperature:0.2});
+      let reply = '';
+      if(Array.isArray(out)) reply = out[0]?.generated_text || JSON.stringify(out);
+      else if(out && out.generated_text) reply = out.generated_text;
+      else reply = JSON.stringify(out);
+      const nodes = chat.querySelectorAll('.msg'); 
+      for(let i=nodes.length-1;i>=0;i--){
+        if(nodes[i].textContent.includes('Gerando resposta')){ nodes[i].remove(); break; }
+      }
+      appendMsg(reply, 'ai');
+    }catch(err){
+      appendMsg('Erro ao gerar resposta: ' + String(err), 'ai');
+      logDebug('generation error', String(err));
+    }
+  });
+
+  start();
+
+})();</script>
+</body>
+</html>
