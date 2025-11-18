@@ -547,6 +547,9 @@ document.addEventListener('DOMContentLoaded', () => {
       }
       if(/piada|conte.*piada|me faz rir/.test(norm)){
         const jokes=[
+          'Por que o computador foi ao médico? Porque ele tinha um vírus! 🤒',
+          'Sabe por que o livro de história sempre está cansado? Porque tem muitos capítulos! :D',
+          'Qual é o cúmulo do azar? Ser atropelado por um carro de autoescola. 😭',
           'Qual é o lugar mais certo do livro? O índice, porque está sempre no ponto. 😅',
           'Por que a matemática é humilde? Porque sabe que não é exata para todo mundo.',
           'Passei por 2, 3 e 5 e ninguém me cumprimentou… acho que não sou par!'
@@ -689,6 +692,10 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     function reply(q){
+      if (q.toLowerCase().startsWith('wiki ')) {
+        return 'Pesquisando na Wikipedia... (precisa implementar fetch real)';
+      }
+
       const quick = smallTalk(q);
       if(quick) return quick;
       try{
@@ -698,15 +705,31 @@ document.addEventListener('DOMContentLoaded', () => {
       }
     }
 
-    function sendMsg(){
+    
+function sendMsg(){
       const val = ask.value;
       if(!val.trim()) return;
       addMsg(val, 'me');
+      if(val.toLowerCase().startsWith('wiki ')){
+          const topic = val.substring(5).trim();
+          addMsg('Pesquisando na Wikipedia...', 'ai');
+          fetch('https://pt.wikipedia.org/api/rest_v1/page/summary/' + encodeURIComponent(topic))
+            .then(r=>r.json())
+            .then(j=>{
+               if(j.extract) addMsg(j.extract, 'ai');
+               else addMsg('Não encontrei nada na Wikipedia 😭', 'ai');
+            })
+            .catch(e=> addMsg('Erro ao pesquisar Wikipedia 😭', 'ai'));
+          ask.value='';
+          ask.focus();
+          return;
+      }
       const r = reply(val);
       addMsg(r, 'ai');
       ask.value='';
       ask.focus();
     }
+
 
     send.addEventListener('click', sendMsg);
     ask.addEventListener('keydown', e=>{ if(e.key==='Enter'){ e.preventDefault(); sendMsg(); } });
