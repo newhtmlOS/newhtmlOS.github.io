@@ -12,16 +12,12 @@ html,body{
   height:100%;
   font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto;
 }
-
-/* container */
 #boot{
   position:fixed;inset:0;
   display:flex;flex-direction:column;
   align-items:center;justify-content:center;
   background:black;
 }
-
-/* floating + soft glow */
 #logo{
   color:white;
   font-size:7vh;
@@ -31,8 +27,6 @@ html,body{
            glow 2.6s ease-in-out infinite 1.4s;
   margin-bottom:4vh;
 }
-
-/* clean snake bar */
 #snakeBar{
   width:45vw;max-width:180px;
   height:1.2vh;max-height:8px;
@@ -45,13 +39,6 @@ html,body{
   background:white;
   animation:snake 0.9s linear infinite;
 }
-
-/* final fadeout */
-@keyframes bootOut{
-  to{opacity:0;visibility:hidden;}
-}
-
-/* animations */
 @keyframes snake{
   0%{transform:translateX(-100%);}
   100%{transform:translateX(400%);}
@@ -71,6 +58,9 @@ html,body{
   50%{text-shadow:0 0 18px rgba(255,255,255,0.55);}
   100%{text-shadow:0 0 0px rgba(255,255,255,0.4);}
 }
+@keyframes bootOut{
+  to{opacity:0;visibility:hidden;}
+}
 </style>
 </head>
 <body>
@@ -81,13 +71,15 @@ html,body{
 </div>
 
 <script>
+// start fadeout at ~6.7s - 0.8s fade
 setTimeout(()=>{ 
   document.getElementById("boot").style.animation="bootOut 0.8s ease forwards";
-}, 4500);
+}, 5900);
 
+// redirect at 6.7s
 setTimeout(()=>{
   window.location.href="htmlOSSYS.html";
-}, 5300);
+}, 6700);
 </script>
 
 </body>
