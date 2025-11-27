@@ -10,35 +10,48 @@ html,body{
   background:black;
   overflow:hidden;
   height:100%;
-  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Oxygen,
-               Ubuntu, Cantarell, "Open Sans", "Helvetica Neue", sans-serif;
+  font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto;
 }
+
+/* container */
 #boot{
   position:fixed;inset:0;
   display:flex;flex-direction:column;
   align-items:center;justify-content:center;
   background:black;
-  transform:translateY(-5vh);
 }
+
+/* floating + soft glow */
 #logo{
   color:white;
   font-size:7vh;
   opacity:0;
-  transform:scale(0.9);
-  animation:fadeIn 1.4s ease forwards;
+  animation:fadeIn 1.4s ease forwards,
+           float 3.2s ease-in-out infinite 1.4s,
+           glow 2.6s ease-in-out infinite 1.4s;
   margin-bottom:4vh;
 }
+
+/* clean snake bar */
 #snakeBar{
   width:45vw;max-width:180px;
   height:1.2vh;max-height:8px;
   background:#111;border-radius:8px;
   overflow:hidden;
+  box-shadow:0 0 10px #000;
 }
 #snakeInner{
   width:25%;height:100%;
   background:white;
   animation:snake 0.9s linear infinite;
 }
+
+/* final fadeout */
+@keyframes bootOut{
+  to{opacity:0;visibility:hidden;}
+}
+
+/* animations */
 @keyframes snake{
   0%{transform:translateX(-100%);}
   100%{transform:translateX(400%);}
@@ -48,18 +61,33 @@ html,body{
   60%{opacity:1;transform:scale(1);}
   100%{opacity:1;}
 }
+@keyframes float{
+  0%{transform:translateY(0);}
+  50%{transform:translateY(-1.2vh);}
+  100%{transform:translateY(0);}
+}
+@keyframes glow{
+  0%{text-shadow:0 0 0px rgba(255,255,255,0.4);}
+  50%{text-shadow:0 0 18px rgba(255,255,255,0.55);}
+  100%{text-shadow:0 0 0px rgba(255,255,255,0.4);}
+}
 </style>
 </head>
 <body>
+
 <div id="boot">
   <div id="logo">htmlOS</div>
   <div id="snakeBar"><div id="snakeInner"></div></div>
 </div>
 
 <script>
-setTimeout(function(){
-  window.location.href = "htmlOSSYS.html";
-}, 6000);
+setTimeout(()=>{ 
+  document.getElementById("boot").style.animation="bootOut 0.8s ease forwards";
+}, 4500);
+
+setTimeout(()=>{
+  window.location.href="htmlOSSYS.html";
+}, 5300);
 </script>
 
 </body>
