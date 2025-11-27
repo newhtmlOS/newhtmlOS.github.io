@@ -1,0 +1,66 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8">
+<title>htmlOS Boot</title>
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<style>
+html,body{
+  margin:0;padding:0;
+  background:black;
+  overflow:hidden;
+  height:100%;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Oxygen,
+               Ubuntu, Cantarell, "Open Sans", "Helvetica Neue", sans-serif;
+}
+#boot{
+  position:fixed;inset:0;
+  display:flex;flex-direction:column;
+  align-items:center;justify-content:center;
+  background:black;
+  transform:translateY(-5vh);
+}
+#logo{
+  color:white;
+  font-size:7vh;
+  opacity:0;
+  transform:scale(0.9);
+  animation:fadeIn 1.4s ease forwards;
+  margin-bottom:4vh;
+}
+#snakeBar{
+  width:45vw;max-width:180px;
+  height:1.2vh;max-height:8px;
+  background:#111;border-radius:8px;
+  overflow:hidden;
+}
+#snakeInner{
+  width:25%;height:100%;
+  background:white;
+  animation:snake 0.9s linear infinite;
+}
+@keyframes snake{
+  0%{transform:translateX(-100%);}
+  100%{transform:translateX(400%);}
+}
+@keyframes fadeIn{
+  0%{opacity:0;transform:scale(0.86);}
+  60%{opacity:1;transform:scale(1);}
+  100%{opacity:1;}
+}
+</style>
+</head>
+<body>
+<div id="boot">
+  <div id="logo">htmlOS</div>
+  <div id="snakeBar"><div id="snakeInner"></div></div>
+</div>
+
+<script>
+setTimeout(function(){
+  window.location.href = "htmlOSSYS.html";
+}, 6000);
+</script>
+
+</body>
+</html>
